@@ -1,0 +1,24 @@
+{
+  "topics": [
+    {
+      "name": "lesson.started",
+      "partitions": 3,
+      "replicationFactor": 1
+    },
+    {
+      "name": "lesson.completed",
+      "partitions": 3,
+      "replicationFactor": 1
+    },
+    {
+      "name": "exercise.answered",
+      "partitions": 3,
+      "replicationFactor": 1
+    },
+    {
+      "name": "ai.invoked",
+      "partitions": 3,
+      "replicationFactor": 1
+    }
+  ]
+}

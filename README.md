@@ -1,105 +1,59 @@
-# AppTet - React Native Expo Project
+# Language Learning Platform
 
-Clean Architecture React Native app built with Expo following production-grade guidelines.
+Monorepo cho ứng dụng học ngoại ngữ với AI.
 
-## 🚀 Tech Stack
-
-- **React Native** 0.81.5
-- **Expo SDK** ~54
-- **TypeScript** (strict mode)
-- **expo-router** - File-based routing
-- **@tanstack/react-query** - Server state management
-- **zustand** - Client state management
-- **nativewind** - TailwindCSS for React Native
-- **react-hook-form** + **zod** - Forms & validation
-- **react-native-reanimated** - Animations
-- **jest** + **@testing-library/react-native** - Testing
-
-## 📁 Project Structure
+## 📁 Cấu trúc
 
 ```
-src/
-├── app/               # expo-router (routing only)
-│   ├── (auth)/       # Auth group routes
-│   ├── (tabs)/       # Tab group routes
-│   └── _layout.tsx   # Root layout
-│
-├── features/         # Business features
-│   ├── auth/
-│   ├── cart/
-│   ├── order/
-│   └── profile/
-│
-├── shared/           # Shared resources
-│   ├── components/
-│   ├── hooks/
-│   ├── services/
-│   ├── utils/
-│   └── constants/
-│
-├── store/            # Zustand stores
-├── api/              # API clients
-├── theme/            # Design system & tokens
-├── types/            # Global types
-├── config/           # Environment config
-└── tests/            # Test files
+├── apps/
+│   ├── mobile-app/      # React Native (Expo)
+│   ├── admin-web/       # Admin CMS (Next.js)
+│   └── backend-api/     # Backend (NestJS)
+├── packages/
+│   ├── shared-types/    # DTO, enums dùng chung
+│   ├── eslint-config/   # Coding convention
+│   └── tsconfig-base/   # TS config
+├── infrastructure/
+│   ├── docker/          # Docker Compose
+│   ├── kafka/           # Kafka config
+│   ├── redis/           # Redis config
+│   └── cloudflare-r2/   # R2 policy
+├── docs/                # Documentation
+└── scripts/             # Automation scripts
 ```
 
-## 🛠️ Setup
-
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Create environment file**
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Start development server**
-   ```bash
-   npm start
-   ```
-
-## 📱 Run on Device
-
-- **Android**: `npm run android`
-- **iOS**: `npm run ios` (macOS only)
-- **Web**: `npm run web`
-
-## 🧪 Testing
+## 🚀 Quick Start
 
 ```bash
-npm test
+# 1. Setup environment
+./scripts/setup-env.sh
+
+# 2. Start infrastructure
+docker compose -f infrastructure/docker/docker-compose.yml up -d
+
+# 3. Run apps
+npm run mobile    # Mobile app
+npm run backend   # Backend API
+npm run admin     # Admin web
 ```
 
-## 📏 Code Quality
+## 📚 Documentation
 
-```bash
-# Lint
-npm run lint
+- [FE Guidelines](./docs/FE_GUIDELINES.md)
+- [Backend Guidelines](./docs/BACKEND_GUIDELINES.md)
+- [API Contract](./docs/API_CONTRACT.md)
+- [Database Schema](./docs/DATABASE_SCHEMA.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Deployment](./docs/DEPLOYMENT.md)
 
-# Format
-npm run format
-```
+## 🛠 Tech Stack
 
-## 📋 Development Guidelines
-
-- File limit: **≤ 500 lines**
-- No business logic in `app/` routes
-- Feature-based structure
-- No cross-feature imports
-- TypeScript strict mode
-- Test logic, not implementation
-
-See [REACT_NATIVE_EXPO_GUIDELINES.md](REACT_NATIVE_EXPO_GUIDELINES.md) for detailed guidelines.
-
-## 🔐 Environment Variables
-
-- `EXPO_PUBLIC_API_URL` - API base URL
-- `EXPO_PUBLIC_ENV` - Environment (development/staging/production)
-
-## 📄 License
-
-Private
+| Component | Technology |
+|-----------|------------|
+| Mobile | React Native + Expo |
+| Admin | Next.js |
+| Backend | NestJS |
+| Database | PostgreSQL |
+| Cache | Redis |
+| Queue | Kafka |
+| Storage | Cloudflare R2 |

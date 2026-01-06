@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.backend
+    container_name: lms_api
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    restart: unless-stopped
+    networks:
+      - lms_network
+
+  postgres:
+    image: postgres:15
+    container_name: lms_postgres
+    environment:
+      POSTGRES_DB: lms
+      POSTGRES_USER: lms_user
+      POSTGRES_PASSWORD: lms_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - lms_network
+
+  redis:
+    image: redis:7
+    container_name: lms_redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    networks:
+      - lms_network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: lms_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - lms_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: lms_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - lms_network
+
+volumes:
+  postgres_data:
+
+networks:
+  lms_network:
+    driver: bridge

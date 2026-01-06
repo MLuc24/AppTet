@@ -1,0 +1,5 @@
+{
+  "name": "@lms/tsconfig-base",
+  "version": "1.0.0",
+  "files": ["tsconfig.base.json"]
+}
