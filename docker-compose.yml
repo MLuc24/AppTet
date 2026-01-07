@@ -29,7 +29,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./infrastructure/postgres/02-create-auth-tables.sql:/docker-entrypoint-initdb.d/02-create-auth-tables.sql
+      - ./infrastructure/postgres/01-create-tables.sql:/docker-entrypoint-initdb.d/02-create-tables.sql
     ports:
       - "5432:5432"
     healthcheck:

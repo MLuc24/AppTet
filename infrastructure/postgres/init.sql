@@ -43,21 +43,21 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- System enums
+-- Auth schema enums (khớp với Prisma schema)
 DO $$ BEGIN
-    CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted');
+    CREATE TYPE auth.user_status AS ENUM ('active', 'suspended', 'deleted');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE platform_type AS ENUM ('ios', 'android', 'web');
+    CREATE TYPE auth.platform AS ENUM ('ios', 'android');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE push_provider AS ENUM ('apns', 'fcm');
+    CREATE TYPE auth.push_provider AS ENUM ('apns', 'fcm');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

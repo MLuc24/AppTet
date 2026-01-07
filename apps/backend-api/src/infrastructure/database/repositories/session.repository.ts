@@ -3,7 +3,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { PrismaClient, AuthSession as PrismaSession } from '.prisma/client';
+import { PrismaClient, auth_sessions as PrismaSession } from '@prisma/client';
 import {
   ISessionRepository,
   CreateSessionData,
@@ -15,8 +15,8 @@ export class SessionRepository implements ISessionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findById(sessionId: string): Promise<SessionEntity | null> {
-    const session = await this.prisma.authSession.findUnique({
-      where: { sessionId },
+    const session = await this.prisma.auth_sessions.findUnique({
+      where: { session_id: sessionId },
     });
     return session ? this.toDomain(session) : null;
   }
@@ -24,69 +24,69 @@ export class SessionRepository implements ISessionRepository {
   async findByAccessTokenHash(
     tokenHash: string,
   ): Promise<SessionEntity | null> {
-    const session = await this.prisma.authSession.findFirst({
-      where: { accessTokenHash: tokenHash },
+    const session = await this.prisma.auth_sessions.findFirst({
+      where: { access_token_hash: tokenHash },
     });
     return session ? this.toDomain(session) : null;
   }
 
   async findActiveByUserId(userId: string): Promise<SessionEntity[]> {
-    const sessions = await this.prisma.authSession.findMany({
+    const sessions = await this.prisma.auth_sessions.findMany({
       where: {
-        userId,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
+        user_id: userId,
+        revoked_at: null,
+        expires_at: { gt: new Date() },
       },
     });
     return sessions.map((s) => this.toDomain(s));
   }
 
   async create(data: CreateSessionData): Promise<SessionEntity> {
-    const session = await this.prisma.authSession.create({
+    const session = await this.prisma.auth_sessions.create({
       data: {
-        userId: data.userId,
-        deviceId: data.deviceId,
-        accessTokenHash: data.accessTokenHash,
+        user_id: data.userId,
+        device_id: data.deviceId,
+        access_token_hash: data.accessTokenHash,
         ip: data.ip,
-        userAgent: data.userAgent,
-        expiresAt: data.expiresAt,
+        user_agent: data.userAgent,
+        expires_at: data.expiresAt,
       },
     });
     return this.toDomain(session);
   }
 
   async revoke(sessionId: string): Promise<void> {
-    await this.prisma.authSession.update({
-      where: { sessionId },
-      data: { revokedAt: new Date() },
+    await this.prisma.auth_sessions.update({
+      where: { session_id: sessionId },
+      data: { revoked_at: new Date() },
     });
   }
 
   async revokeAllByUserId(userId: string): Promise<void> {
-    await this.prisma.authSession.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    await this.prisma.auth_sessions.updateMany({
+      where: { user_id: userId, revoked_at: null },
+      data: { revoked_at: new Date() },
     });
   }
 
   async deleteExpired(): Promise<number> {
-    const result = await this.prisma.authSession.deleteMany({
-      where: { expiresAt: { lt: new Date() } },
+    const result = await this.prisma.auth_sessions.deleteMany({
+      where: { expires_at: { lt: new Date() } },
     });
     return result.count;
   }
 
   private toDomain(prismaSession: PrismaSession): SessionEntity {
     return new SessionEntity({
-      sessionId: prismaSession.sessionId,
-      userId: prismaSession.userId,
-      deviceId: prismaSession.deviceId || undefined,
-      accessTokenHash: prismaSession.accessTokenHash,
+      sessionId: prismaSession.session_id,
+      userId: prismaSession.user_id,
+      deviceId: prismaSession.device_id || undefined,
+      accessTokenHash: prismaSession.access_token_hash,
       ip: prismaSession.ip || undefined,
-      userAgent: prismaSession.userAgent || undefined,
-      expiresAt: prismaSession.expiresAt,
-      revokedAt: prismaSession.revokedAt || undefined,
-      createdAt: prismaSession.createdAt,
+      userAgent: prismaSession.user_agent || undefined,
+      expiresAt: prismaSession.expires_at,
+      revokedAt: prismaSession.revoked_at || undefined,
+      createdAt: prismaSession.created_at || new Date(),
     });
   }
 }

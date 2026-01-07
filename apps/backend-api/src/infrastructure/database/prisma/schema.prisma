@@ -1,7 +1,3 @@
-// Prisma Schema for Auth Module
-// Database: PostgreSQL
-// Schema: auth (khớp với infrastructure/postgres/01-create-tables.sql)
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
@@ -10,194 +6,945 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["auth", "content"]
+  schemas  = ["auth", "content", "gamification", "learning", "system"]
 }
 
-// ========================================
-// ENUMS
-// ========================================
+model auth_sessions {
+  session_id        String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id           String           @db.Uuid
+  device_id         String?          @db.Uuid
+  access_token_hash String           @db.VarChar(255)
+  ip                String?          @db.VarChar(45)
+  user_agent        String?
+  expires_at        DateTime         @db.Timestamptz(6)
+  revoked_at        DateTime?        @db.Timestamptz(6)
+  created_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  user_devices      user_devices?    @relation(fields: [device_id], references: [device_id], onUpdate: NoAction, map: "fk_auth_sessions_device")
+  users             users            @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_auth_sessions_user")
+  refresh_tokens    refresh_tokens[]
 
-enum UserStatus {
-  active
-  suspended
-  deleted
+  @@index([access_token_hash], map: "idx_auth_sessions_token_hash")
+  @@index([user_id], map: "idx_auth_sessions_user_id")
+  @@schema("auth")
+}
+
+model push_tokens {
+  push_token_id      String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  device_id          String        @db.Uuid
+  token              String        @unique
+  provider           push_provider
+  is_active          Boolean?      @default(true)
+  last_registered_at DateTime?     @default(now()) @db.Timestamptz(6)
+  created_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  user_devices       user_devices  @relation(fields: [device_id], references: [device_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_push_tokens_device")
 
   @@schema("auth")
 }
 
-enum Platform {
+model refresh_tokens {
+  refresh_token_id String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  session_id       String        @db.Uuid
+  token_hash       String        @unique @db.VarChar(255)
+  expires_at       DateTime      @db.Timestamptz(6)
+  revoked_at       DateTime?     @db.Timestamptz(6)
+  created_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  auth_sessions    auth_sessions @relation(fields: [session_id], references: [session_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_refresh_tokens_session")
+
+  @@index([session_id], map: "idx_refresh_tokens_session_id")
+  @@schema("auth")
+}
+
+model roles {
+  role_id    Int          @id @default(autoincrement())
+  code       String       @unique @db.VarChar(50)
+  name       String       @db.VarChar(255)
+  created_at DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?    @default(now()) @db.Timestamptz(6)
+  user_roles user_roles[]
+
+  @@schema("auth")
+}
+
+model user_devices {
+  device_id          String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id            String          @db.Uuid
+  platform           platform
+  device_model       String?         @db.VarChar(255)
+  os_version         String?         @db.VarChar(50)
+  app_version        String?         @db.VarChar(50)
+  device_fingerprint String?         @db.VarChar(255)
+  locale             String?         @db.VarChar(10)
+  created_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  auth_sessions      auth_sessions[]
+  push_tokens        push_tokens[]
+  users              users           @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_devices_user")
+
+  @@index([user_id], map: "idx_user_devices_user_id")
+  @@schema("auth")
+}
+
+model user_roles {
+  user_id    String    @db.Uuid
+  role_id    Int
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  roles      roles     @relation(fields: [role_id], references: [role_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_role")
+  users      users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_user")
+
+  @@id([user_id, role_id])
+  @@schema("auth")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  user_id                                          String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email                                            String?               @unique @db.VarChar(255)
+  phone                                            String?               @unique @db.VarChar(50)
+  password_hash                                    String                @db.VarChar(255)
+  display_name                                     String                @db.VarChar(255)
+  avatar_asset_id                                  String?               @db.Uuid
+  status                                           user_status           @default(active)
+  dob                                              DateTime?             @db.Date
+  native_language_id                               Int?
+  timezone                                         String?               @default("UTC") @db.VarChar(100)
+  last_login_at                                    DateTime?             @db.Timestamptz(6)
+  created_at                                       DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                                       DateTime?             @default(now()) @db.Timestamptz(6)
+  auth_sessions                                    auth_sessions[]
+  user_devices                                     user_devices[]
+  user_roles                                       user_roles[]
+  media_assets_users_avatar_asset_idTomedia_assets media_assets?         @relation("users_avatar_asset_idTomedia_assets", fields: [avatar_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_users_avatar")
+  languages                                        languages?            @relation(fields: [native_language_id], references: [language_id], onUpdate: NoAction, map: "fk_users_native_language")
+  course_versions                                  course_versions[]
+  courses                                          courses[]
+  media_assets_media_assets_created_byTousers      media_assets[]        @relation("media_assets_created_byTousers")
+  streaks                                          streaks?
+  user_achievements                                user_achievements[]
+  user_inventory                                   user_inventory[]
+  user_league_entries                              user_league_entries[]
+  wallets                                          wallets?
+  xp_ledger                                        xp_ledger[]
+  enrollments                                      enrollments[]
+  practice_sessions                                practice_sessions[]
+  review_queue                                     review_queue[]
+  srs_schedules                                    srs_schedules[]
+  user_item_mastery                                user_item_mastery[]
+  audit_logs                                       audit_logs[]
+  notifications                                    notifications[]
+  support_tickets                                  support_tickets[]
+
+  @@index([email], map: "idx_users_email")
+  @@index([phone], map: "idx_users_phone")
+  @@schema("auth")
+}
+
+model course_localizations {
+  course_id   String    @db.Uuid
+  language_id Int
+  title       String    @db.VarChar(255)
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  courses     courses   @relation(fields: [course_id], references: [course_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_course_localizations_course")
+  languages   languages @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_course_localizations_language")
+
+  @@id([course_id, language_id])
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model course_versions {
+  course_version_id String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  course_id         String        @db.Uuid
+  version_number    Int
+  status            String        @default("draft") @db.VarChar(50)
+  published_at      DateTime?     @db.Timestamptz(6)
+  created_by        String?       @db.Uuid
+  created_at        DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?     @default(now()) @db.Timestamptz(6)
+  courses           courses       @relation(fields: [course_id], references: [course_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_course_versions_course")
+  users             users?        @relation(fields: [created_by], references: [user_id], onUpdate: NoAction, map: "fk_course_versions_created_by")
+  units             units[]
+  enrollments       enrollments[]
+
+  @@schema("content")
+}
+
+model courses {
+  course_id                                       String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  target_language_id                              Int
+  base_language_id                                Int
+  level_id                                        Int
+  course_code                                     String                 @unique @db.VarChar(50)
+  is_published                                    Boolean?               @default(false)
+  created_by                                      String?                @db.Uuid
+  created_at                                      DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime?              @default(now()) @db.Timestamptz(6)
+  course_localizations                            course_localizations[]
+  course_versions                                 course_versions[]
+  languages_courses_base_language_idTolanguages   languages              @relation("courses_base_language_idTolanguages", fields: [base_language_id], references: [language_id], onUpdate: NoAction, map: "fk_courses_base_language")
+  users                                           users?                 @relation(fields: [created_by], references: [user_id], onUpdate: NoAction, map: "fk_courses_created_by")
+  proficiency_levels                              proficiency_levels     @relation(fields: [level_id], references: [level_id], onUpdate: NoAction, map: "fk_courses_level")
+  languages_courses_target_language_idTolanguages languages              @relation("courses_target_language_idTolanguages", fields: [target_language_id], references: [language_id], onUpdate: NoAction, map: "fk_courses_target_language")
+  enrollments                                     enrollments[]
+
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model exercise_items {
+  exercise_item_id       String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  exercise_id            String              @db.Uuid
+  item_order             Int
+  item_type              String              @db.VarChar(50)
+  correct_answer_text    String?
+  correct_answer_item_id String?             @db.Uuid
+  created_at             DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?           @default(now()) @db.Timestamptz(6)
+  learning_items         learning_items?     @relation(fields: [correct_answer_item_id], references: [item_id], onUpdate: NoAction, map: "fk_exercise_items_correct_answer_item")
+  exercises              exercises           @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exercise_items_exercise")
+  exercise_options       exercise_options[]
+  hints                  hints[]
+  attempt_responses      attempt_responses[]
+
+  @@schema("content")
+}
+
+model exercise_options {
+  option_id         String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  exercise_item_id  String              @db.Uuid
+  option_text       String
+  option_asset_id   String?             @db.Uuid
+  is_correct        Boolean?            @default(false)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  media_assets      media_assets?       @relation(fields: [option_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_exercise_options_asset")
+  exercise_items    exercise_items      @relation(fields: [exercise_item_id], references: [exercise_item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exercise_options_exercise_item")
+  attempt_responses attempt_responses[]
+
+  @@schema("content")
+}
+
+model exercise_prompts {
+  exercise_prompt_id String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  exercise_id        String        @db.Uuid
+  language_id        Int
+  prompt_text        String
+  prompt_asset_id    String?       @db.Uuid
+  created_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?     @default(now()) @db.Timestamptz(6)
+  media_assets       media_assets? @relation(fields: [prompt_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_exercise_prompts_asset")
+  exercises          exercises     @relation(fields: [exercise_id], references: [exercise_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exercise_prompts_exercise")
+  languages          languages     @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exercise_prompts_language")
+
+  @@unique([exercise_id, language_id])
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model exercises {
+  exercise_id        String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  lesson_id          String             @db.Uuid
+  exercise_type      String             @db.VarChar(50)
+  difficulty         Int?
+  points             Int?               @default(0)
+  time_limit_seconds Int?
+  created_at         DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?          @default(now()) @db.Timestamptz(6)
+  exercise_items     exercise_items[]
+  exercise_prompts   exercise_prompts[]
+  lessons            lessons            @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_exercises_lesson")
+
+  @@index([lesson_id], map: "idx_exercises_lesson")
+  @@schema("content")
+}
+
+model hints {
+  hint_id            String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  exercise_item_id   String               @db.Uuid
+  hint_text          String
+  cost_currency      String?              @db.VarChar(10)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  exercise_items     exercise_items       @relation(fields: [exercise_item_id], references: [exercise_item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_hints_exercise_item")
+  attempt_hint_usage attempt_hint_usage[]
+
+  @@schema("content")
+}
+
+model item_examples {
+  example_id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  item_id                 String         @db.Uuid
+  example_text            String
+  translation_language_id Int?
+  example_translation     String?
+  audio_asset_id          String?        @db.Uuid
+  created_at              DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?      @default(now()) @db.Timestamptz(6)
+  media_assets            media_assets?  @relation(fields: [audio_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_item_examples_audio")
+  learning_items          learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_item_examples_item")
+  languages               languages?     @relation(fields: [translation_language_id], references: [language_id], onUpdate: NoAction, map: "fk_item_examples_translation_language")
+
+  @@schema("content")
+}
+
+model item_forms {
+  item_form_id   String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  item_id        String         @db.Uuid
+  text           String
+  ipa            String?        @db.VarChar(255)
+  audio_asset_id String?        @db.Uuid
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  media_assets   media_assets?  @relation(fields: [audio_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_item_forms_audio")
+  learning_items learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_item_forms_item")
+
+  @@schema("content")
+}
+
+model item_translations {
+  item_translation_id String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  item_id             String         @db.Uuid
+  language_id         Int
+  meaning             String
+  note                String?
+  created_at          DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?      @default(now()) @db.Timestamptz(6)
+  learning_items      learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_item_translations_item")
+  languages           languages      @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_item_translations_language")
+
+  @@unique([item_id, language_id])
+  @@schema("content")
+}
+
+model languages {
+  language_id                                   Int                    @id @default(autoincrement())
+  code                                          String                 @unique @db.VarChar(10)
+  name                                          String                 @db.VarChar(100)
+  created_at                                    DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                                    DateTime?              @default(now()) @db.Timestamptz(6)
+  users                                         users[]
+  course_localizations                          course_localizations[]
+  courses_courses_base_language_idTolanguages   courses[]              @relation("courses_base_language_idTolanguages")
+  courses_courses_target_language_idTolanguages courses[]              @relation("courses_target_language_idTolanguages")
+  exercise_prompts                              exercise_prompts[]
+  item_examples                                 item_examples[]
+  item_translations                             item_translations[]
+  learning_items                                learning_items[]
+  lesson_localizations                          lesson_localizations[]
+  skill_localizations                           skill_localizations[]
+  unit_localizations                            unit_localizations[]
+
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model learning_items {
+  item_id            String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  target_language_id Int
+  item_type          String              @db.VarChar(50)
+  cefr_level_id      Int?
+  created_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?           @default(now()) @db.Timestamptz(6)
+  exercise_items     exercise_items[]
+  item_examples      item_examples[]
+  item_forms         item_forms[]
+  item_translations  item_translations[]
+  proficiency_levels proficiency_levels? @relation(fields: [cefr_level_id], references: [level_id], onUpdate: NoAction, map: "fk_learning_items_cefr_level")
+  languages          languages           @relation(fields: [target_language_id], references: [language_id], onUpdate: NoAction, map: "fk_learning_items_target_language")
+  lesson_items       lesson_items[]
+  review_queue       review_queue[]
+  srs_schedules      srs_schedules[]
+  user_item_mastery  user_item_mastery[]
+
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lesson_assets {
+  lesson_asset_id String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  lesson_id       String       @db.Uuid
+  asset_id        String       @db.Uuid
+  asset_role      String       @db.VarChar(50)
+  order_index     Int?
+  created_at      DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?    @default(now()) @db.Timestamptz(6)
+  media_assets    media_assets @relation(fields: [asset_id], references: [asset_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_assets_asset")
+  lessons         lessons      @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_assets_lesson")
+
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lesson_items {
+  lesson_id      String         @db.Uuid
+  item_id        String         @db.Uuid
+  exposure_type  String         @db.VarChar(50)
+  created_at     DateTime?      @default(now()) @db.Timestamptz(6)
+  learning_items learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_items_item")
+  lessons        lessons        @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_items_lesson")
+
+  @@id([lesson_id, item_id])
+  @@schema("content")
+}
+
+model lesson_localizations {
+  lesson_id   String    @db.Uuid
+  language_id Int
+  title       String    @db.VarChar(255)
+  intro_text  String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  languages   languages @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_localizations_language")
+  lessons     lessons   @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_localizations_lesson")
+
+  @@id([lesson_id, language_id])
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lessons {
+  lesson_id            String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  skill_id             String                 @db.Uuid
+  lesson_type          String                 @db.VarChar(50)
+  order_index          Int
+  estimated_minutes    Int?
+  is_published         Boolean?               @default(false)
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  exercises            exercises[]
+  lesson_assets        lesson_assets[]
+  lesson_items         lesson_items[]
+  lesson_localizations lesson_localizations[]
+  skills               skills                 @relation(fields: [skill_id], references: [skill_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lessons_skill")
+  lesson_progress      lesson_progress[]
+  practice_sessions    practice_sessions[]
+
+  @@index([skill_id], map: "idx_lessons_skill")
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model media_assets {
+  asset_id                                  String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  storage_provider                          String                 @db.VarChar(50)
+  file_url                                  String
+  mime_type                                 String                 @db.VarChar(100)
+  file_size_bytes                           BigInt?
+  checksum                                  String?                @db.VarChar(255)
+  created_by                                String?                @db.Uuid
+  created_at                                DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime?              @default(now()) @db.Timestamptz(6)
+  users_users_avatar_asset_idTomedia_assets users[]                @relation("users_avatar_asset_idTomedia_assets")
+  exercise_options                          exercise_options[]
+  exercise_prompts                          exercise_prompts[]
+  item_examples                             item_examples[]
+  item_forms                                item_forms[]
+  lesson_assets                             lesson_assets[]
+  users_media_assets_created_byTousers      users?                 @relation("media_assets_created_byTousers", fields: [created_by], references: [user_id], onUpdate: NoAction, map: "fk_media_assets_created_by")
+  achievements                              achievements[]
+  speaking_submissions                      speaking_submissions[]
+
+  @@schema("content")
+}
+
+model proficiency_levels {
+  level_id       Int              @id @default(autoincrement())
+  code           String           @unique @db.VarChar(10)
+  name           String           @db.VarChar(100)
+  order_index    Int
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  courses        courses[]
+  learning_items learning_items[]
+
+  @@schema("content")
+}
+
+model skill_localizations {
+  skill_id    String    @db.Uuid
+  language_id Int
+  title       String    @db.VarChar(255)
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  languages   languages @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_skill_localizations_language")
+  skills      skills    @relation(fields: [skill_id], references: [skill_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_skill_localizations_skill")
+
+  @@id([skill_id, language_id])
+  @@schema("content")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model skills {
+  skill_id            String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  unit_id             String                @db.Uuid
+  skill_type          String                @db.VarChar(50)
+  order_index         Int
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  lessons             lessons[]
+  skill_localizations skill_localizations[]
+  units               units                 @relation(fields: [unit_id], references: [unit_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_skills_unit")
+  skill_mastery       skill_mastery[]
+
+  @@index([unit_id], map: "idx_skills_unit")
+  @@schema("content")
+}
+
+model unit_localizations {
+  unit_id     String    @db.Uuid
+  language_id Int
+  title       String    @db.VarChar(255)
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  languages   languages @relation(fields: [language_id], references: [language_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_unit_localizations_language")
+  units       units     @relation(fields: [unit_id], references: [unit_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_unit_localizations_unit")
+
+  @@id([unit_id, language_id])
+  @@schema("content")
+}
+
+model units {
+  unit_id            String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  course_version_id  String               @db.Uuid
+  order_index        Int
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  skills             skills[]
+  unit_localizations unit_localizations[]
+  course_versions    course_versions      @relation(fields: [course_version_id], references: [course_version_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_units_course_version")
+
+  @@index([course_version_id], map: "idx_units_course_version")
+  @@schema("content")
+}
+
+model achievements {
+  achievement_id    String              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  code              String              @unique @db.VarChar(50)
+  name              String              @db.VarChar(255)
+  description       String?
+  condition_type    String?             @db.VarChar(100)
+  condition_value   Json?
+  icon_asset_id     String?             @db.Uuid
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  media_assets      media_assets?       @relation(fields: [icon_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_achievements_icon")
+  user_achievements user_achievements[]
+
+  @@schema("gamification")
+}
+
+model league_weeks {
+  league_week_id      String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  week_start_date     DateTime              @unique @db.Date
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  user_league_entries user_league_entries[]
+
+  @@schema("gamification")
+}
+
+model leagues {
+  league_id           Int                   @id @default(autoincrement())
+  code                String                @unique @db.VarChar(50)
+  name                String                @db.VarChar(100)
+  order_index         Int
+  created_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  user_league_entries user_league_entries[]
+
+  @@schema("gamification")
+}
+
+model store_items {
+  store_item_id  String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sku            String           @unique @db.VarChar(100)
+  name           String           @db.VarChar(255)
+  description    String?
+  price_amount   Int
+  is_active      Boolean?         @default(true)
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  user_inventory user_inventory[]
+
+  @@schema("gamification")
+}
+
+model streaks {
+  user_id             String    @id @db.Uuid
+  current_streak_days Int?      @default(0)
+  longest_streak_days Int?      @default(0)
+  last_activity_date  DateTime? @db.Date
+  freeze_count        Int?      @default(0)
+  updated_at          DateTime? @default(now()) @db.Timestamptz(6)
+  users               users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_streaks_user")
+
+  @@schema("gamification")
+}
+
+model user_achievements {
+  user_id        String       @db.Uuid
+  achievement_id String       @db.Uuid
+  achieved_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  achievements   achievements @relation(fields: [achievement_id], references: [achievement_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_achievements_achievement")
+  users          users        @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_achievements_user")
+
+  @@id([user_id, achievement_id])
+  @@schema("gamification")
+}
+
+model user_inventory {
+  inventory_id  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id       String      @db.Uuid
+  store_item_id String      @db.Uuid
+  quantity      Int?        @default(0)
+  updated_at    DateTime?   @default(now()) @db.Timestamptz(6)
+  store_items   store_items @relation(fields: [store_item_id], references: [store_item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_inventory_store_item")
+  users         users       @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_inventory_user")
+
+  @@unique([user_id, store_item_id])
+  @@schema("gamification")
+}
+
+model user_league_entries {
+  user_league_entry_id String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  league_week_id       String       @db.Uuid
+  league_id            Int
+  user_id              String       @db.Uuid
+  xp_total             Int?         @default(0)
+  updated_at           DateTime?    @default(now()) @db.Timestamptz(6)
+  leagues              leagues      @relation(fields: [league_id], references: [league_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_league_entries_league")
+  league_weeks         league_weeks @relation(fields: [league_week_id], references: [league_week_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_league_entries_league_week")
+  users                users        @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_league_entries_user")
+
+  @@index([league_week_id, league_id], map: "idx_user_league_entries_week_league")
+  @@schema("gamification")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model wallet_transactions {
+  transaction_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  wallet_id      String    @db.Uuid
+  txn_type       String    @db.VarChar(50)
+  source_type    String?   @db.VarChar(50)
+  source_id      String?   @db.Uuid
+  amount         Int
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  wallets        wallets   @relation(fields: [wallet_id], references: [wallet_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_wallet_transactions_wallet")
+
+  @@index([wallet_id], map: "idx_wallet_transactions_wallet")
+  @@schema("gamification")
+}
+
+model wallets {
+  wallet_id           String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id             String                @unique @db.Uuid
+  currency_code       String?               @default("GEM") @db.VarChar(10)
+  balance             Int?                  @default(0)
+  updated_at          DateTime?             @default(now()) @db.Timestamptz(6)
+  wallet_transactions wallet_transactions[]
+  users               users                 @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_wallets_user")
+
+  @@schema("gamification")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model xp_ledger {
+  xp_ledger_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id      String    @db.Uuid
+  source_type  String    @db.VarChar(50)
+  source_id    String?   @db.Uuid
+  xp_amount    Int
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  users        users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_xp_ledger_user")
+
+  @@index([user_id, created_at], map: "idx_xp_ledger_user_created")
+  @@schema("gamification")
+}
+
+model attempt_hint_usage {
+  attempt_id  String    @db.Uuid
+  hint_id     String    @db.Uuid
+  used_at     DateTime? @default(now()) @db.Timestamptz(6)
+  cost_amount Int?
+  attempts    attempts  @relation(fields: [attempt_id], references: [attempt_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attempt_hint_usage_attempt")
+  hints       hints     @relation(fields: [hint_id], references: [hint_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attempt_hint_usage_hint")
+
+  @@id([attempt_id, hint_id])
+  @@schema("learning")
+}
+
+model attempt_responses {
+  response_id          String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  attempt_id           String                 @db.Uuid
+  exercise_item_id     String                 @db.Uuid
+  submitted_text       String?
+  selected_option_id   String?                @db.Uuid
+  is_correct           Boolean?               @default(false)
+  score_awarded        Int?                   @default(0)
+  time_spent_seconds   Int?
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  attempts             attempts               @relation(fields: [attempt_id], references: [attempt_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attempt_responses_attempt")
+  exercise_items       exercise_items         @relation(fields: [exercise_item_id], references: [exercise_item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attempt_responses_exercise_item")
+  exercise_options     exercise_options?      @relation(fields: [selected_option_id], references: [option_id], onUpdate: NoAction, map: "fk_attempt_responses_selected_option")
+  speaking_submissions speaking_submissions[]
+  writing_submissions  writing_submissions[]
+
+  @@unique([attempt_id, exercise_item_id])
+  @@schema("learning")
+}
+
+model attempts {
+  attempt_id         String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  session_id         String               @db.Uuid
+  attempt_number     Int
+  total_score        Int?                 @default(0)
+  max_score          Int?                 @default(0)
+  completed_at       DateTime?            @db.Timestamptz(6)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  attempt_hint_usage attempt_hint_usage[]
+  attempt_responses  attempt_responses[]
+  practice_sessions  practice_sessions    @relation(fields: [session_id], references: [session_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attempts_session")
+
+  @@schema("learning")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model enrollments {
+  enrollment_id     String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id           String            @db.Uuid
+  course_id         String            @db.Uuid
+  course_version_id String            @db.Uuid
+  enrolled_at       DateTime?         @default(now()) @db.Timestamptz(6)
+  status            String            @default("ongoing") @db.VarChar(50)
+  created_at        DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?         @default(now()) @db.Timestamptz(6)
+  courses           courses           @relation(fields: [course_id], references: [course_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_enrollments_course")
+  course_versions   course_versions   @relation(fields: [course_version_id], references: [course_version_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_enrollments_course_version")
+  users             users             @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_enrollments_user")
+  lesson_progress   lesson_progress[]
+  skill_mastery     skill_mastery[]
+
+  @@unique([user_id, course_id])
+  @@index([user_id, course_id], map: "idx_enrollments_user_course")
+  @@schema("learning")
+}
+
+model lesson_progress {
+  lesson_progress_id String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  enrollment_id      String      @db.Uuid
+  lesson_id          String      @db.Uuid
+  best_score         Int?        @default(0)
+  last_score         Int?        @default(0)
+  completed_at       DateTime?   @db.Timestamptz(6)
+  attempts_count     Int?        @default(0)
+  updated_at         DateTime?   @default(now()) @db.Timestamptz(6)
+  enrollments        enrollments @relation(fields: [enrollment_id], references: [enrollment_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_progress_enrollment")
+  lessons            lessons     @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_lesson_progress_lesson")
+
+  @@unique([enrollment_id, lesson_id])
+  @@index([enrollment_id], map: "idx_lesson_progress_enrollment")
+  @@schema("learning")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model practice_sessions {
+  session_id String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String     @db.Uuid
+  lesson_id  String     @db.Uuid
+  started_at DateTime?  @default(now()) @db.Timestamptz(6)
+  ended_at   DateTime?  @db.Timestamptz(6)
+  mode       String     @db.VarChar(50)
+  created_at DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?  @default(now()) @db.Timestamptz(6)
+  attempts   attempts[]
+  lessons    lessons    @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_practice_sessions_lesson")
+  users      users      @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_practice_sessions_user")
+
+  @@schema("learning")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model review_queue {
+  review_queue_id String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id         String         @db.Uuid
+  item_id         String         @db.Uuid
+  due_at          DateTime       @db.Timestamptz(6)
+  priority        Int?           @default(0)
+  source          String         @db.VarChar(50)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  learning_items  learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_review_queue_item")
+  users           users          @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_review_queue_user")
+
+  @@index([user_id, due_at], map: "idx_review_queue_user_due")
+  @@schema("learning")
+}
+
+model skill_mastery {
+  skill_mastery_id  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  enrollment_id     String      @db.Uuid
+  skill_id          String      @db.Uuid
+  mastery_level     Decimal?    @default(0) @db.Decimal(5, 2)
+  last_practiced_at DateTime?   @db.Timestamptz(6)
+  updated_at        DateTime?   @default(now()) @db.Timestamptz(6)
+  enrollments       enrollments @relation(fields: [enrollment_id], references: [enrollment_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_skill_mastery_enrollment")
+  skills            skills      @relation(fields: [skill_id], references: [skill_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_skill_mastery_skill")
+
+  @@unique([enrollment_id, skill_id])
+  @@schema("learning")
+}
+
+model speaking_submissions {
+  speaking_submission_id String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  response_id            String            @db.Uuid
+  audio_asset_id         String            @db.Uuid
+  transcript_text        String?
+  pronunciation_score    Decimal?          @db.Decimal(5, 2)
+  fluency_score          Decimal?          @db.Decimal(5, 2)
+  created_at             DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?         @default(now()) @db.Timestamptz(6)
+  media_assets           media_assets      @relation(fields: [audio_asset_id], references: [asset_id], onUpdate: NoAction, map: "fk_speaking_submissions_audio")
+  attempt_responses      attempt_responses @relation(fields: [response_id], references: [response_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_speaking_submissions_response")
+
+  @@schema("learning")
+}
+
+model srs_schedules {
+  srs_schedule_id String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id         String         @db.Uuid
+  item_id         String         @db.Uuid
+  stage           Int?           @default(0)
+  interval_days   Int?           @default(1)
+  ease_factor     Decimal?       @default(2.5) @db.Decimal(5, 2)
+  next_review_at  DateTime?      @db.Timestamptz(6)
+  last_review_at  DateTime?      @db.Timestamptz(6)
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  learning_items  learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_srs_schedules_item")
+  users           users          @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_srs_schedules_user")
+
+  @@unique([user_id, item_id])
+  @@index([user_id, next_review_at], map: "idx_srs_schedules_user_next_review")
+  @@schema("learning")
+}
+
+model user_item_mastery {
+  user_item_mastery_id String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id              String         @db.Uuid
+  item_id              String         @db.Uuid
+  mastery_level        Decimal?       @default(0) @db.Decimal(5, 2)
+  last_seen_at         DateTime?      @db.Timestamptz(6)
+  updated_at           DateTime?      @default(now()) @db.Timestamptz(6)
+  learning_items       learning_items @relation(fields: [item_id], references: [item_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_item_mastery_item")
+  users                users          @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_item_mastery_user")
+
+  @@unique([user_id, item_id])
+  @@index([user_id], map: "idx_user_item_mastery_user")
+  @@schema("learning")
+}
+
+model writing_submissions {
+  writing_submission_id String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  response_id           String            @db.Uuid
+  essay_text            String
+  coherence_score       Decimal?          @db.Decimal(5, 2)
+  grammar_score         Decimal?          @db.Decimal(5, 2)
+  feedback_text         String?
+  created_at            DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?         @default(now()) @db.Timestamptz(6)
+  attempt_responses     attempt_responses @relation(fields: [response_id], references: [response_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_writing_submissions_response")
+
+  @@schema("learning")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model audit_logs {
+  audit_id      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  actor_user_id String?   @db.Uuid
+  action        String    @db.VarChar(50)
+  entity_type   String    @db.VarChar(100)
+  entity_id     String?   @db.Uuid
+  before_json   Json?
+  after_json    Json?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  users         users?    @relation(fields: [actor_user_id], references: [user_id], onUpdate: NoAction, map: "fk_audit_logs_actor")
+
+  @@index([entity_type, entity_id], map: "idx_audit_logs_entity")
+  @@schema("system")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model notifications {
+  notification_id String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id         String    @db.Uuid
+  title           String    @db.VarChar(255)
+  body            String
+  deep_link       String?
+  status          String    @default("queued") @db.VarChar(50)
+  scheduled_at    DateTime? @db.Timestamptz(6)
+  sent_at         DateTime? @db.Timestamptz(6)
+  read_at         DateTime? @db.Timestamptz(6)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @default(now()) @db.Timestamptz(6)
+  users           users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_user")
+
+  @@index([user_id, status], map: "idx_notifications_user_status")
+  @@schema("system")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model support_tickets {
+  ticket_id   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String    @db.Uuid
+  category    String    @db.VarChar(50)
+  subject     String    @db.VarChar(255)
+  description String
+  status      String    @default("open") @db.VarChar(50)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  users       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_support_tickets_user")
+
+  @@schema("system")
+}
+
+enum platform {
   ios
   android
 
   @@schema("auth")
 }
 
-enum PushProvider {
+enum provider {
+  LOCAL
+  GOOGLE
+
+  @@schema("auth")
+}
+
+enum push_provider {
   apns
   fcm
 
   @@schema("auth")
 }
 
-// ========================================
-// AUTH MODELS (7 tables)
-// ========================================
+enum role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
 
-// 1) users
-model User {
-  userId           String    @id @default(dbgenerated("uuid_generate_v4()")) @map("user_id") @db.Uuid
-  email            String?   @unique @db.VarChar(255)
-  phone            String?   @unique @db.VarChar(50)
-  passwordHash     String    @map("password_hash") @db.VarChar(255)
-  displayName      String    @map("display_name") @db.VarChar(255)
-  avatarAssetId    String?   @map("avatar_asset_id") @db.Uuid
-  status           UserStatus @default(active)
-  dob              DateTime? @db.Date
-  nativeLanguageId Int?      @map("native_language_id")
-  timezone         String    @default("UTC") @db.VarChar(100)
-  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // Relations
-  userRoles    UserRole[]
-  authSessions AuthSession[]
-  userDevices  UserDevice[]
-  avatarAsset  MediaAsset?   @relation(fields: [avatarAssetId], references: [assetId], onDelete: SetNull)
-
-  @@map("users")
   @@schema("auth")
 }
 
-// 2) roles
-model Role {
-  roleId    Int      @id @default(autoincrement()) @map("role_id")
-  code      String   @unique @db.VarChar(50)
-  name      String   @db.VarChar(255)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+enum user_status {
+  active
+  suspended
+  deleted
 
-  // Relations
-  userRoles UserRole[]
-
-  @@map("roles")
   @@schema("auth")
-}
-
-// 3) user_roles
-model UserRole {
-  userId    String   @map("user_id") @db.Uuid
-  roleId    Int      @map("role_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  // Relations
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@map("user_roles")
-  @@schema("auth")
-}
-
-// 4) auth_sessions
-model AuthSession {
-  sessionId       String    @id @default(dbgenerated("uuid_generate_v4()")) @map("session_id") @db.Uuid
-  userId          String    @map("user_id") @db.Uuid
-  deviceId        String?   @map("device_id") @db.Uuid
-  accessTokenHash String    @map("access_token_hash") @db.VarChar(255)
-  ip              String?   @db.VarChar(45)
-  userAgent       String?   @db.Text
-  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  // Relations
-  user          User           @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  device        UserDevice?    @relation(fields: [deviceId], references: [deviceId], onDelete: SetNull)
-  refreshTokens RefreshToken[]
-
-  @@index([userId])
-  @@index([accessTokenHash])
-  @@map("auth_sessions")
-  @@schema("auth")
-}
-
-// 5) refresh_tokens
-model RefreshToken {
-  refreshTokenId String    @id @default(dbgenerated("uuid_generate_v4()")) @map("refresh_token_id") @db.Uuid
-  sessionId      String    @map("session_id") @db.Uuid
-  tokenHash      String    @unique @map("token_hash") @db.VarChar(255)
-  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  // Relations
-  session AuthSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
-
-  @@index([sessionId])
-  @@map("refresh_tokens")
-  @@schema("auth")
-}
-
-// 6) user_devices
-model UserDevice {
-  deviceId          String   @id @default(dbgenerated("uuid_generate_v4()")) @map("device_id") @db.Uuid
-  userId            String   @map("user_id") @db.Uuid
-  platform          Platform
-  deviceModel       String?  @map("device_model") @db.VarChar(255)
-  osVersion         String?  @map("os_version") @db.VarChar(50)
-  appVersion        String?  @map("app_version") @db.VarChar(50)
-  deviceFingerprint String?  @map("device_fingerprint") @db.VarChar(255)
-  locale            String?  @db.VarChar(10)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // Relations
-  user         User          @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  authSessions AuthSession[]
-  pushTokens   PushToken[]
-
-  @@index([userId])
-  @@map("user_devices")
-  @@schema("auth")
-}
-
-// 7) push_tokens
-model PushToken {
-  pushTokenId      String       @id @default(dbgenerated("uuid_generate_v4()")) @map("push_token_id") @db.Uuid
-  deviceId         String       @map("device_id") @db.Uuid
-  token            String       @unique @db.Text
-  provider         PushProvider
-  isActive         Boolean      @default(true) @map("is_active")
-  lastRegisteredAt DateTime     @default(now()) @map("last_registered_at") @db.Timestamptz(6)
-  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // Relations
-  device UserDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
-
-  @@map("push_tokens")
-  @@schema("auth")
-}
-
-// ========================================
-// CONTENT MODELS (minimal for FK reference)
-// ========================================
-
-model MediaAsset {
-  assetId         String   @id @default(dbgenerated("uuid_generate_v4()")) @map("asset_id") @db.Uuid
-  storageProvider String   @map("storage_provider") @db.VarChar(50)
-  fileUrl         String   @map("file_url") @db.Text
-  mimeType        String   @map("mime_type") @db.VarChar(100)
-  fileSizeBytes   BigInt?  @map("file_size_bytes")
-  checksum        String?  @db.VarChar(255)
-  createdBy       String?  @map("created_by") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // Relations
-  users User[]
-
-  @@map("media_assets")
-  @@schema("content")
 }
