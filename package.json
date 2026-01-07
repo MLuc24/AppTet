@@ -16,5 +16,9 @@
   },
   "devDependencies": {
     "prettier": "^3.3.0"
+  },
+  "dependencies": {
+    "@nestjs/config": "^4.0.2",
+    "dotenv": "^17.2.3"
   }
 }
