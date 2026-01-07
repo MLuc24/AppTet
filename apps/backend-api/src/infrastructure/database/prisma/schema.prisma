@@ -1,0 +1,65 @@
+// Prisma Schema for Auth Module
+// Database: PostgreSQL
+// Schema: auth (khớp với infrastructure/postgres/init.sql)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["auth"]
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+
+  @@schema("auth")
+}
+
+enum Provider {
+  LOCAL
+  GOOGLE
+
+  @@schema("auth")
+}
+
+model User {
+  id                   String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email                String         @unique @db.VarChar(255)
+  passwordHash         String?        @map("password_hash") @db.VarChar(255)
+  role                 Role           @default(STUDENT)
+  provider             Provider       @default(LOCAL)
+  emailVerified        Boolean        @default(false) @map("email_verified")
+  emailVerificationToken String?      @map("email_verification_token") @db.VarChar(255)
+  emailVerificationTokenExpires DateTime? @map("email_verification_token_expires") @db.Timestamptz(6)
+  passwordResetToken   String?        @map("password_reset_token") @db.VarChar(255)
+  passwordResetTokenExpires DateTime?  @map("password_reset_token_expires") @db.Timestamptz(6)
+  lastLoginAt          DateTime?      @map("last_login_at") @db.Timestamptz(6)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  refreshTokens        RefreshToken[]
+
+  @@index([email])
+  @@map("users")
+  @@schema("auth")
+}
+
+model RefreshToken {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+  @@schema("auth")
+}

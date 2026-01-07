@@ -2,7 +2,7 @@ export const AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   apiPrefix: 'api/v1',
-  
+
   // CORS configuration
   cors: {
     origin: process.env.CORS_ORIGIN || '*',

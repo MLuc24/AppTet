@@ -33,8 +33,12 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   await app.listen(AppConfig.port);
-  
-  console.log(`🚀 Backend API is running on: http://localhost:${AppConfig.port}/${AppConfig.apiPrefix}`);
-  console.log(`📱 Mobile app can connect to: http://localhost:${AppConfig.port}`);
+
+  console.log(
+    `🚀 Backend API is running on: http://localhost:${AppConfig.port}/${AppConfig.apiPrefix}`,
+  );
+  console.log(
+    `📱 Mobile app can connect to: http://localhost:${AppConfig.port}`,
+  );
 }
-bootstrap();
+void bootstrap();

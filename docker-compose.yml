@@ -28,7 +28,8 @@ services:
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./infrastructure/postgres/02-create-auth-tables.sql:/docker-entrypoint-initdb.d/02-create-auth-tables.sql
     ports:
       - "5432:5432"
     healthcheck:

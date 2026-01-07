@@ -1,0 +1,244 @@
+name: 🔍 Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # =====================================================
+  # PR Title Check
+  # =====================================================
+  pr-title-check:
+    name: 📝 PR Title Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Check PR title format
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+          requireScope: false
+          subjectPattern: ^[A-Z].+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            starts with an uppercase character.
+
+  # =====================================================
+  # Check Guidelines Compliance
+  # =====================================================
+  guidelines-check:
+    name: 📚 Guidelines Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Check for large files
+        run: |
+          echo "🔍 Checking changed files for size violations..."
+          
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          VIOLATIONS=0
+          for file in $CHANGED_FILES; do
+            if [[ -f "$file" ]] && [[ "$file" =~ \.(ts|tsx|js|jsx)$ ]]; then
+              LINES=$(wc -l < "$file" 2>/dev/null || echo "0")
+              if [ "$LINES" -gt 500 ]; then
+                echo "❌ $file: $LINES lines (max: 500)"
+                VIOLATIONS=$((VIOLATIONS + 1))
+              fi
+            fi
+          done
+          
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo ""
+            echo "❌ $VIOLATIONS file(s) exceed 500 lines!"
+            echo "📖 See .github/COPILOT_INSTRUCTIONS.md"
+            exit 1
+          else
+            echo "✅ All changed files comply with size limit"
+          fi
+      
+      - name: 🔍 Check for prohibited patterns
+        run: |
+          echo "🔍 Checking for prohibited code patterns..."
+          
+          VIOLATIONS=0
+          
+          # Check for console.log in production code
+          if git diff origin/${{ github.base_ref }}...HEAD | grep "^+.*console\.log"; then
+            echo "⚠️  WARNING: Found console.log in changes"
+          fi
+          
+          # Check for TODO without ticket reference
+          if git diff origin/${{ github.base_ref }}...HEAD | grep "^+.*TODO" | grep -v "TODO:.*#[0-9]"; then
+            echo "⚠️  WARNING: Found TODO without ticket reference"
+          fi
+          
+          # Check for any type usage
+          if git diff origin/${{ github.base_ref }}...HEAD -- "*.ts" "*.tsx" | grep "^+.*: any"; then
+            echo "❌ VIOLATION: Found 'any' type usage"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+          
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo ""
+            echo "❌ Found code pattern violations!"
+            exit 1
+          else
+            echo "✅ No prohibited patterns found"
+          fi
+
+  # =====================================================
+  # PR Size Check
+  # =====================================================
+  pr-size-check:
+    name: 📏 PR Size Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Check PR size
+        run: |
+          echo "🔍 Checking PR size..."
+          
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l)
+          CHANGED_LINES=$(git diff --stat origin/${{ github.base_ref }}...HEAD | tail -1 | grep -oE '[0-9]+ insertions' | grep -oE '[0-9]+' || echo "0")
+          
+          echo "📊 Files changed: $CHANGED_FILES"
+          echo "📊 Lines changed: $CHANGED_LINES"
+          
+          if [ "$CHANGED_FILES" -gt 50 ]; then
+            echo "⚠️  WARNING: Large PR ($CHANGED_FILES files)"
+            echo "Consider splitting into smaller PRs"
+          fi
+          
+          if [ "$CHANGED_LINES" -gt 1000 ]; then
+            echo "⚠️  WARNING: Large PR ($CHANGED_LINES lines)"
+            echo "Consider splitting into smaller PRs"
+          fi
+
+  # =====================================================
+  # Check Required Files Updated
+  # =====================================================
+  documentation-check:
+    name: 📖 Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Check if docs need update
+        run: |
+          echo "🔍 Checking if documentation needs update..."
+          
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          # Check if architecture changed but docs not updated
+          if echo "$CHANGED_FILES" | grep -q "src/domain\|src/infrastructure"; then
+            if ! echo "$CHANGED_FILES" | grep -q "docs/"; then
+              echo "⚠️  WARNING: Domain/Infrastructure changed but no doc updates"
+              echo "Consider updating ARCHITECTURE.md or BACKEND_GUIDELINES.md"
+            fi
+          fi
+          
+          # Check if new feature added
+          if echo "$CHANGED_FILES" | grep -q "src/modules/.*/.*.module.ts$"; then
+            if ! echo "$CHANGED_FILES" | grep -q "README.md"; then
+              echo "⚠️  WARNING: New module added, consider updating README.md"
+            fi
+          fi
+
+  # =====================================================
+  # Security Check
+  # =====================================================
+  security-check:
+    name: 🔒 Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Check for secrets
+        run: |
+          echo "🔍 Checking for accidentally committed secrets..."
+          
+          VIOLATIONS=0
+          
+          # Check for common secret patterns in diff
+          if git diff origin/${{ github.base_ref }}...HEAD | grep -iE "password.*=.*['\"]|api_key.*=.*['\"]|secret.*=.*['\"]|token.*=.*['\"]"; then
+            echo "❌ POTENTIAL SECRET FOUND in code!"
+            echo "Make sure you're not committing real credentials"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+          
+          # Check for hardcoded IPs
+          if git diff origin/${{ github.base_ref }}...HEAD | grep -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"; then
+            echo "⚠️  WARNING: Found hardcoded IP addresses"
+          fi
+          
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            exit 1
+          else
+            echo "✅ No secrets detected"
+          fi
+
+  # =====================================================
+  # Final PR Status
+  # =====================================================
+  pr-status:
+    name: ✅ PR Status
+    runs-on: ubuntu-latest
+    needs:
+      - pr-title-check
+      - guidelines-check
+      - pr-size-check
+      - documentation-check
+      - security-check
+    if: always()
+    
+    steps:
+      - name: 📋 PR Check Summary
+        run: |
+          echo "📊 PR Checks Summary:"
+          echo "===================="
+          echo "Title: ${{ needs.pr-title-check.result }}"
+          echo "Guidelines: ${{ needs.guidelines-check.result }}"
+          echo "Size: ${{ needs.pr-size-check.result }}"
+          echo "Documentation: ${{ needs.documentation-check.result }}"
+          echo "Security: ${{ needs.security-check.result }}"
+          echo "===================="
+          
+          if [ "${{ needs.pr-title-check.result }}" != "success" ] || \
+             [ "${{ needs.guidelines-check.result }}" != "success" ] || \
+             [ "${{ needs.security-check.result }}" != "success" ]; then
+            echo "❌ Some PR checks failed!"
+            exit 1
+          else
+            echo "✅ All PR checks passed!"
+          fi
