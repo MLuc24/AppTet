@@ -1,34 +1,26 @@
 /**
  * User Domain Entity
  * Framework-agnostic user representation
+ * Maps to auth.users table
  */
 
-export enum UserRole {
-  STUDENT = 'STUDENT',
-  INSTRUCTOR = 'INSTRUCTOR',
-  ADMIN = 'ADMIN',
-}
-
-export enum AuthProvider {
-  LOCAL = 'LOCAL',
-  GOOGLE = 'GOOGLE',
+export enum UserStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  DELETED = 'deleted',
 }
 
 export interface UserProps {
-  id: string;
-  email: string;
-  username?: string;
-  passwordHash?: string;
-  firstName?: string;
-  lastName?: string;
-  avatar?: string;
-  role: UserRole;
-  provider: AuthProvider;
-  providerId?: string;
-  emailVerified: boolean;
-  emailVerifyToken?: string;
-  passwordResetToken?: string;
-  passwordResetExpiry?: Date;
+  userId: string;
+  email?: string;
+  phone?: string;
+  passwordHash: string;
+  displayName: string;
+  avatarAssetId?: string;
+  status: UserStatus;
+  dob?: Date;
+  nativeLanguageId?: number;
+  timezone: string;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -41,67 +33,45 @@ export class UserEntity {
     this.props = props;
   }
 
-  get id(): string {
-    return this.props.id;
+  // Getters
+  get userId(): string {
+    return this.props.userId;
   }
 
-  get email(): string {
+  get email(): string | undefined {
     return this.props.email;
   }
 
-  get username(): string | undefined {
-    return this.props.username;
+  get phone(): string | undefined {
+    return this.props.phone;
   }
 
-  get passwordHash(): string | undefined {
+  get passwordHash(): string {
     return this.props.passwordHash;
   }
 
-  get firstName(): string | undefined {
-    return this.props.firstName;
+  get displayName(): string {
+    return this.props.displayName;
   }
 
-  get lastName(): string | undefined {
-    return this.props.lastName;
+  get avatarAssetId(): string | undefined {
+    return this.props.avatarAssetId;
   }
 
-  get fullName(): string {
-    if (this.props.firstName && this.props.lastName) {
-      return `${this.props.firstName} ${this.props.lastName}`;
-    }
-    return this.props.firstName || this.props.lastName || this.props.email;
+  get status(): UserStatus {
+    return this.props.status;
   }
 
-  get avatar(): string | undefined {
-    return this.props.avatar;
+  get dob(): Date | undefined {
+    return this.props.dob;
   }
 
-  get role(): UserRole {
-    return this.props.role;
+  get nativeLanguageId(): number | undefined {
+    return this.props.nativeLanguageId;
   }
 
-  get provider(): AuthProvider {
-    return this.props.provider;
-  }
-
-  get providerId(): string | undefined {
-    return this.props.providerId;
-  }
-
-  get emailVerified(): boolean {
-    return this.props.emailVerified;
-  }
-
-  get emailVerifyToken(): string | undefined {
-    return this.props.emailVerifyToken;
-  }
-
-  get passwordResetToken(): string | undefined {
-    return this.props.passwordResetToken;
-  }
-
-  get passwordResetExpiry(): Date | undefined {
-    return this.props.passwordResetExpiry;
+  get timezone(): string {
+    return this.props.timezone;
   }
 
   get lastLoginAt(): Date | undefined {
@@ -117,47 +87,27 @@ export class UserEntity {
   }
 
   // Business logic methods
-
-  isPasswordSet(): boolean {
-    return !!this.props.passwordHash;
+  isActive(): boolean {
+    return this.props.status === UserStatus.ACTIVE;
   }
 
-  canLogin(): boolean {
-    return (
-      this.props.emailVerified || this.props.provider === AuthProvider.GOOGLE
-    );
+  isSuspended(): boolean {
+    return this.props.status === UserStatus.SUSPENDED;
   }
 
-  isAdmin(): boolean {
-    return this.props.role === UserRole.ADMIN;
+  isDeleted(): boolean {
+    return this.props.status === UserStatus.DELETED;
   }
 
-  isInstructor(): boolean {
-    return this.props.role === UserRole.INSTRUCTOR;
+  hasEmail(): boolean {
+    return !!this.props.email;
   }
 
-  hasRole(role: UserRole): boolean {
-    return this.props.role === role;
-  }
-
-  isPasswordResetTokenValid(): boolean {
-    if (!this.props.passwordResetToken || !this.props.passwordResetExpiry) {
-      return false;
-    }
-    return this.props.passwordResetExpiry > new Date();
+  hasPhone(): boolean {
+    return !!this.props.phone;
   }
 
   // Mutation methods (returns new instance)
-
-  verifyEmail(): UserEntity {
-    return new UserEntity({
-      ...this.props,
-      emailVerified: true,
-      emailVerifyToken: undefined,
-      updatedAt: new Date(),
-    });
-  }
-
   updateLastLogin(): UserEntity {
     return new UserEntity({
       ...this.props,
@@ -166,33 +116,42 @@ export class UserEntity {
     });
   }
 
-  setPasswordResetToken(token: string, expiryMinutes: number = 60): UserEntity {
-    const expiry = new Date();
-    expiry.setMinutes(expiry.getMinutes() + expiryMinutes);
-
-    return new UserEntity({
-      ...this.props,
-      passwordResetToken: token,
-      passwordResetExpiry: expiry,
-      updatedAt: new Date(),
-    });
-  }
-
-  clearPasswordResetToken(): UserEntity {
-    return new UserEntity({
-      ...this.props,
-      passwordResetToken: undefined,
-      passwordResetExpiry: undefined,
-      updatedAt: new Date(),
-    });
-  }
-
   updatePassword(passwordHash: string): UserEntity {
     return new UserEntity({
       ...this.props,
       passwordHash,
-      passwordResetToken: undefined,
-      passwordResetExpiry: undefined,
+      updatedAt: new Date(),
+    });
+  }
+
+  updateDisplayName(displayName: string): UserEntity {
+    return new UserEntity({
+      ...this.props,
+      displayName,
+      updatedAt: new Date(),
+    });
+  }
+
+  suspend(): UserEntity {
+    return new UserEntity({
+      ...this.props,
+      status: UserStatus.SUSPENDED,
+      updatedAt: new Date(),
+    });
+  }
+
+  activate(): UserEntity {
+    return new UserEntity({
+      ...this.props,
+      status: UserStatus.ACTIVE,
+      updatedAt: new Date(),
+    });
+  }
+
+  softDelete(): UserEntity {
+    return new UserEntity({
+      ...this.props,
+      status: UserStatus.DELETED,
       updatedAt: new Date(),
     });
   }
@@ -200,16 +159,14 @@ export class UserEntity {
   // Serialization for response (no sensitive data)
   toPublicObject() {
     return {
-      id: this.props.id,
+      userId: this.props.userId,
       email: this.props.email,
-      username: this.props.username,
-      firstName: this.props.firstName,
-      lastName: this.props.lastName,
-      fullName: this.fullName,
-      avatar: this.props.avatar,
-      role: this.props.role,
-      provider: this.props.provider,
-      emailVerified: this.props.emailVerified,
+      phone: this.props.phone,
+      displayName: this.props.displayName,
+      avatarAssetId: this.props.avatarAssetId,
+      status: this.props.status,
+      dob: this.props.dob,
+      timezone: this.props.timezone,
       lastLoginAt: this.props.lastLoginAt,
       createdAt: this.props.createdAt,
     };

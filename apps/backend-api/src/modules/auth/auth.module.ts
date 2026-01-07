@@ -7,24 +7,24 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '.prisma/client';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-
-// Domain Ports
-import { IUserRepository } from '../../domain/ports/user-repository.port';
-import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
-import { ITokenService } from '../../domain/ports/token-service.port';
-import { IHashService } from '../../domain/ports/hash-service.port';
-import { IEmailService } from '../../domain/ports/email-service.port';
+import {
+  USER_REPOSITORY,
+  ROLE_REPOSITORY,
+  SESSION_REPOSITORY,
+  TOKEN_SERVICE,
+  HASH_SERVICE,
+} from './auth.constants';
 
 // Infrastructure Implementations
 import { UserRepository } from '../../infrastructure/database/repositories/user.repository';
-import { RefreshTokenRepository } from '../../infrastructure/database/repositories/refresh-token.repository';
+import { RoleRepository } from '../../infrastructure/database/repositories/role.repository';
+import { SessionRepository } from '../../infrastructure/database/repositories/session.repository';
 import { JwtTokenService } from '../../infrastructure/auth/jwt-token.service';
 import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service';
-import { EmailService } from '../../infrastructure/email/email.service';
 
 @Module({
   imports: [
@@ -61,26 +61,26 @@ import { EmailService } from '../../infrastructure/email/email.service';
 
     // Repository implementations
     {
-      provide: IUserRepository,
+      provide: USER_REPOSITORY,
       useClass: UserRepository,
     },
     {
-      provide: IRefreshTokenRepository,
-      useClass: RefreshTokenRepository,
+      provide: ROLE_REPOSITORY,
+      useClass: RoleRepository,
+    },
+    {
+      provide: SESSION_REPOSITORY,
+      useClass: SessionRepository,
     },
 
     // Service implementations
     {
-      provide: ITokenService,
+      provide: TOKEN_SERVICE,
       useClass: JwtTokenService,
     },
     {
-      provide: IHashService,
+      provide: HASH_SERVICE,
       useClass: BcryptHashService,
-    },
-    {
-      provide: IEmailService,
-      useClass: EmailService,
     },
   ],
   exports: [AuthService, JwtStrategy, PassportModule],

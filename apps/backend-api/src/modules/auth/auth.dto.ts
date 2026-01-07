@@ -17,10 +17,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // ============ REQUEST DTOs ============
 
 export class RegisterDto {
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
   @IsEmail({}, { message: 'Invalid email format' })
-  @IsNotEmpty({ message: 'Email is required' })
-  email: string;
+  email?: string;
+
+  @ApiPropertyOptional({ example: '+84901234567' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  phone?: string;
 
   @ApiProperty({ example: 'SecurePass123!', minLength: 8 })
   @IsString()
@@ -32,24 +38,23 @@ export class RegisterDto {
   })
   password: string;
 
-  @ApiPropertyOptional({ example: 'John' })
-  @IsOptional()
+  @ApiProperty({ example: 'John Doe' })
   @IsString()
-  @MaxLength(50)
-  firstName?: string;
-
-  @ApiPropertyOptional({ example: 'Doe' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  lastName?: string;
+  @IsNotEmpty({ message: 'Display name is required' })
+  @MaxLength(255)
+  displayName: string;
 }
 
 export class LoginDto {
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
   @IsEmail({}, { message: 'Invalid email format' })
-  @IsNotEmpty({ message: 'Email is required' })
-  email: string;
+  email?: string;
+
+  @ApiPropertyOptional({ example: '+84901234567' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
 
   @ApiProperty({ example: 'SecurePass123!' })
   @IsString()
@@ -123,34 +128,22 @@ export class LogoutDto {
 
 export class UserResponseDto {
   @ApiProperty()
-  id: string;
+  userId: string;
+
+  @ApiPropertyOptional()
+  email?: string;
+
+  @ApiPropertyOptional()
+  phone?: string;
 
   @ApiProperty()
-  email: string;
+  displayName: string;
 
   @ApiPropertyOptional()
-  username?: string;
+  avatarAssetId?: string;
 
-  @ApiPropertyOptional()
-  firstName?: string;
-
-  @ApiPropertyOptional()
-  lastName?: string;
-
-  @ApiPropertyOptional()
-  fullName?: string;
-
-  @ApiPropertyOptional()
-  avatar?: string;
-
-  @ApiProperty({ enum: ['STUDENT', 'INSTRUCTOR', 'ADMIN'] })
-  role: string;
-
-  @ApiProperty({ enum: ['LOCAL', 'GOOGLE'] })
-  provider: string;
-
-  @ApiProperty()
-  emailVerified: boolean;
+  @ApiProperty({ enum: ['active', 'suspended', 'deleted'] })
+  status: string;
 
   @ApiPropertyOptional()
   lastLoginAt?: Date;

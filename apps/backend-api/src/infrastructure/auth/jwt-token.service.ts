@@ -40,7 +40,7 @@ export class JwtTokenService implements ITokenService {
       {
         sub: payload.sub,
         email: payload.email,
-        role: payload.role,
+        phone: payload.phone,
       } as any,
       {
         expiresIn: this.accessTokenExpiration,
@@ -53,7 +53,7 @@ export class JwtTokenService implements ITokenService {
       {
         sub: payload.sub,
         email: payload.email,
-        role: payload.role,
+        phone: payload.phone,
       } as any,
       {
         expiresIn: this.refreshTokenExpiration,
@@ -78,13 +78,13 @@ export class JwtTokenService implements ITokenService {
     try {
       const payload = await this.jwtService.verifyAsync<{
         sub: string;
-        email: string;
-        role: string;
+        email?: string;
+        phone?: string;
       }>(token);
       return {
         sub: payload.sub,
         email: payload.email,
-        role: payload.role,
+        phone: payload.phone,
       };
     } catch (error) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {
@@ -98,13 +98,13 @@ export class JwtTokenService implements ITokenService {
     try {
       const payload = await this.jwtService.verifyAsync<{
         sub: string;
-        email: string;
-        role: string;
+        email?: string;
+        phone?: string;
       }>(token);
       return {
         sub: payload.sub,
         email: payload.email,
-        role: payload.role,
+        phone: payload.phone,
       };
     } catch (error) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {
@@ -120,11 +120,11 @@ export class JwtTokenService implements ITokenService {
       if (!payload || typeof payload === 'string') {
         return null;
       }
-      const decoded = payload as { sub: string; email: string; role: string };
+      const decoded = payload as { sub: string; email?: string; phone?: string };
       return {
         sub: decoded.sub,
         email: decoded.email,
-        role: decoded.role,
+        phone: decoded.phone,
       };
     } catch {
       return null;

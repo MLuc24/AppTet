@@ -4,9 +4,9 @@
  */
 
 export interface JwtPayload {
-  sub: string; // user ID
-  email: string;
-  role: string;
+  sub: string; // user ID (userId)
+  email?: string;
+  phone?: string;
   iat?: number;
   exp?: number;
 }

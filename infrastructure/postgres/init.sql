@@ -14,41 +14,61 @@ CREATE SCHEMA IF NOT EXISTS gamification;
 CREATE SCHEMA IF NOT EXISTS system;
 
 -- Set default privileges
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA content GRANT ALL ON TABLES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA content GRANT ALL ON SEQUENCES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA learning GRANT ALL ON TABLES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA learning GRANT ALL ON SEQUENCES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA gamification GRANT ALL ON TABLES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA gamification GRANT ALL ON SEQUENCES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA system GRANT ALL ON TABLES TO lms_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA system GRANT ALL ON SEQUENCES TO lms_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO lms_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO lms_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO lms_user;
 
 -- Create enum types for better type safety
+
+-- Auth schema enums (khớp với Prisma schema)
 DO $$ BEGIN
-    -- User status
+    CREATE TYPE auth.role AS ENUM ('STUDENT', 'INSTRUCTOR', 'ADMIN');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE auth.provider AS ENUM ('LOCAL', 'GOOGLE');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- System enums
+DO $$ BEGIN
     CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    -- Platform types
     CREATE TYPE platform_type AS ENUM ('ios', 'android', 'web');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    -- Push provider types
     CREATE TYPE push_provider AS ENUM ('apns', 'fcm');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    -- Lesson types
     CREATE TYPE lesson_type AS ENUM ('practice', 'story', 'dialogue', 'test', 'review');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    -- Exercise types
     CREATE TYPE exercise_type AS ENUM (
         'mcq', 'fill_blank', 'matching', 'reorder', 
         'translation', 'listening_mcq', 'speaking', 
@@ -59,14 +79,12 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    -- Session modes
     CREATE TYPE session_mode AS ENUM ('learn', 'review', 'test');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
 DO $$ BEGIN
-    -- Notification status
     CREATE TYPE notification_status AS ENUM ('queued', 'sent', 'read', 'failed');
 EXCEPTION
     WHEN duplicate_object THEN null;
@@ -88,4 +106,5 @@ BEGIN
     RAISE NOTICE 'Database: lms';
     RAISE NOTICE 'Extensions: uuid-ossp, pg_trgm, btree_gin';
     RAISE NOTICE 'Schemas: auth, content, learning, gamification, system';
+    RAISE NOTICE 'Auth enums: role, provider';
 END $$;

@@ -4,24 +4,20 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import { PrismaClient, User as PrismaUser } from '.prisma/client';
 import {
   IUserRepository,
   CreateUserData,
   UpdateUserData,
 } from '../../../domain/ports/user-repository.port';
-import {
-  UserEntity,
-  UserRole,
-  AuthProvider,
-} from '../../../domain/entities/user.entity';
+import { UserEntity, UserStatus } from '../../../domain/entities/user.entity';
 
 @Injectable()
 export class UserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findById(id: string): Promise<UserEntity | null> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async findById(userId: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({ where: { userId } });
     return user ? this.toDomain(user) : null;
   }
 
@@ -30,74 +26,56 @@ export class UserRepository implements IUserRepository {
     return user ? this.toDomain(user) : null;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async findByUsername(_username: string): Promise<UserEntity | null> {
-    // Username không có trong schema hiện tại
-    return null;
-  }
-
-  async findByEmailVerifyToken(token: string): Promise<UserEntity | null> {
-    const user = await this.prisma.user.findFirst({
-      where: { emailVerificationToken: token },
-    });
+  async findByPhone(phone: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({ where: { phone } });
     return user ? this.toDomain(user) : null;
-  }
-
-  async findByPasswordResetToken(token: string): Promise<UserEntity | null> {
-    const user = await this.prisma.user.findFirst({
-      where: { passwordResetToken: token },
-    });
-    return user ? this.toDomain(user) : null;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async findByProviderId(
-    _provider: string,
-    _providerId: string,
-  ): Promise<UserEntity | null> {
-    // ProviderId không có trong schema hiện tại
-    return null;
   }
 
   async create(data: CreateUserData): Promise<UserEntity> {
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
+        phone: data.phone,
         passwordHash: data.passwordHash,
-        provider: data.provider || 'LOCAL',
-        emailVerificationToken: data.emailVerifyToken,
-        emailVerified: data.emailVerified || false,
-        role: data.role || 'STUDENT',
+        displayName: data.displayName,
+        avatarAssetId: data.avatarAssetId,
+        status: data.status || UserStatus.ACTIVE,
+        dob: data.dob,
+        nativeLanguageId: data.nativeLanguageId,
+        timezone: data.timezone || 'UTC',
       },
     });
     return this.toDomain(user);
   }
 
-  async update(id: string, data: UpdateUserData): Promise<UserEntity> {
+  async update(userId: string, data: UpdateUserData): Promise<UserEntity> {
     const updateData: Record<string, unknown> = {};
 
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.passwordHash !== undefined)
       updateData.passwordHash = data.passwordHash;
-    if (data.emailVerified !== undefined)
-      updateData.emailVerified = data.emailVerified;
-    if (data.emailVerifyToken !== undefined)
-      updateData.emailVerificationToken = data.emailVerifyToken;
-    if (data.passwordResetToken !== undefined)
-      updateData.passwordResetToken = data.passwordResetToken;
-    if (data.passwordResetExpiry !== undefined)
-      updateData.passwordResetTokenExpires = data.passwordResetExpiry;
+    if (data.displayName !== undefined)
+      updateData.displayName = data.displayName;
+    if (data.avatarAssetId !== undefined)
+      updateData.avatarAssetId = data.avatarAssetId;
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.dob !== undefined) updateData.dob = data.dob;
+    if (data.nativeLanguageId !== undefined)
+      updateData.nativeLanguageId = data.nativeLanguageId;
+    if (data.timezone !== undefined) updateData.timezone = data.timezone;
     if (data.lastLoginAt !== undefined)
       updateData.lastLoginAt = data.lastLoginAt;
 
     const user = await this.prisma.user.update({
-      where: { id },
+      where: { userId },
       data: updateData,
     });
     return this.toDomain(user);
   }
 
-  async delete(id: string): Promise<void> {
-    await this.prisma.user.delete({ where: { id } });
+  async delete(userId: string): Promise<void> {
+    await this.prisma.user.delete({ where: { userId } });
   }
 
   async existsByEmail(email: string): Promise<boolean> {
@@ -105,29 +83,24 @@ export class UserRepository implements IUserRepository {
     return count > 0;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async existsByUsername(_username: string): Promise<boolean> {
-    // Username không có trong schema hiện tại
-    return false;
+  async existsByPhone(phone: string): Promise<boolean> {
+    const count = await this.prisma.user.count({ where: { phone } });
+    return count > 0;
   }
 
   // Mapper: Prisma model → Domain entity
   private toDomain(prismaUser: PrismaUser): UserEntity {
     return new UserEntity({
-      id: prismaUser.id,
-      email: prismaUser.email,
-      username: undefined,
-      passwordHash: prismaUser.passwordHash || undefined,
-      firstName: undefined,
-      lastName: undefined,
-      avatar: undefined,
-      role: prismaUser.role as UserRole,
-      provider: prismaUser.provider as AuthProvider,
-      providerId: undefined,
-      emailVerified: prismaUser.emailVerified,
-      emailVerifyToken: prismaUser.emailVerificationToken || undefined,
-      passwordResetToken: prismaUser.passwordResetToken || undefined,
-      passwordResetExpiry: prismaUser.passwordResetTokenExpires || undefined,
+      userId: prismaUser.userId,
+      email: prismaUser.email || undefined,
+      phone: prismaUser.phone || undefined,
+      passwordHash: prismaUser.passwordHash,
+      displayName: prismaUser.displayName,
+      avatarAssetId: prismaUser.avatarAssetId || undefined,
+      status: prismaUser.status as UserStatus,
+      dob: prismaUser.dob || undefined,
+      nativeLanguageId: prismaUser.nativeLanguageId || undefined,
+      timezone: prismaUser.timezone,
       lastLoginAt: prismaUser.lastLoginAt || undefined,
       createdAt: prismaUser.createdAt,
       updatedAt: prismaUser.updatedAt,
