@@ -13,7 +13,7 @@ services:
     depends_on:
       - postgres
       - redis
-      - kafka
+      - mongodb
     restart: unless-stopped
     networks:
       - lms_network
@@ -25,23 +25,60 @@ services:
       POSTGRES_DB: lms
       POSTGRES_USER: lms_user
       POSTGRES_PASSWORD: lms_pass
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lms_user -d lms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - lms_network
+    restart: unless-stopped
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: lms_redis
     command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
+      - redis_data:/data
       - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - lms_network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    container_name: lms_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: lms_user
+      MONGO_INITDB_ROOT_PASSWORD: lms_pass
+      MONGO_INITDB_DATABASE: lms_ai
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./infrastructure/mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lms_network
+    restart: unless-stopped
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -67,6 +104,9 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
+  mongodb_data:
+  mongodb_config:
 
 networks:
   lms_network:
