@@ -2,6 +2,13 @@
 
 Monorepo cho ứng dụng học ngoại ngữ với AI.
 
+## 📦 Repositories
+
+- **Backend (Repo này)**: Full monorepo với backend, frontend, infrastructure
+- **Frontend**: [lms-frontend-app](https://github.com/MLuc24/lms-frontend-app) - Chỉ chứa mobile app code
+
+> **Lưu ý**: Local development vẫn sử dụng cấu trúc đầy đủ. Frontend repo riêng chỉ để deploy/distribute.
+
 ## 📁 Cấu trúc
 
 ```
@@ -41,6 +48,7 @@ npm run admin     # Admin web
 
 - [FE Guidelines](./docs/FE_GUIDELINES.md)
 - [Backend Guidelines](./docs/BACKEND_GUIDELINES.md)
+- [Frontend Repo Setup](./docs/FRONTEND_REPO_SETUP.md) ⭐
 - [API Contract](./docs/API_CONTRACT.md)
 - [Database Schema](./docs/DATABASE_SCHEMA.md)
 - [Architecture](./docs/ARCHITECTURE.md)
