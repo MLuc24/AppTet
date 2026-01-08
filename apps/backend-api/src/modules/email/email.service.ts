@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EmailService as ResendEmailService } from '../../infrastructure/email/email.service';
+import { EmailService as SmtpEmailService } from '../../infrastructure/email/email.service';
 
 /**
  * Email module service wrapper
- * Reuses the Resend implementation from the infrastructure layer.
+ * Reuses the SMTP implementation from the infrastructure layer.
  */
 @Injectable()
-export class EmailService extends ResendEmailService {
+export class EmailService extends SmtpEmailService {
   constructor(configService: ConfigService) {
     super(configService);
   }

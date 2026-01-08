@@ -16,6 +16,8 @@ import {
   LoginDto,
   UserResponseDto,
   AuthTokensResponseDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
 } from './auth.dto';
 import {
   USER_REPOSITORY,
@@ -295,15 +297,142 @@ export class AuthService {
   }
 
   // Placeholder methods for compatibility
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    return { message: 'Email verification not implemented yet' };
+  async verifyEmail(
+    token: string,
+    email?: string,
+  ): Promise<{ status: 'verified' | 'already_verified' | 'invalid' }> {
+    if (!token && !email) {
+      return { status: 'invalid' };
+    }
+
+    if (token) {
+      const user = await this.userRepository.findByEmailVerificationToken(token);
+      if (user) {
+        if (user.emailVerified) {
+          return { status: 'already_verified' };
+        }
+
+        await this.userRepository.update(user.userId, {
+          emailVerificationToken: null,
+          emailVerified: true,
+        });
+
+        if (user.email) {
+          try {
+            await this.emailService.sendWelcomeEmail({
+              email: user.email,
+              name: user.displayName,
+            });
+          } catch (error) {
+            this.logger.error(
+              `Failed to send welcome email to ${user.email}`,
+              error instanceof Error ? error.stack : undefined,
+            );
+          }
+        }
+
+        return { status: 'verified' };
+      }
+    }
+
+    if (email) {
+      const userByEmail = await this.userRepository.findByEmail(email);
+      if (userByEmail?.emailVerified) {
+        return { status: 'already_verified' };
+      }
+    }
+
+    return { status: 'invalid' };
   }
 
-  async forgotPassword(dto: any): Promise<{ message: string }> {
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.userRepository.findByEmail(dto.email);
+    if (!user || !user.email) {
+      return { message: 'Password reset email sent if email exists' };
+    }
+
+    const otpCode = this.generateOtpCode();
+    const expiresInMinutes = this.getOtpExpiryMinutes();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+
+    await this.userRepository.update(user.userId, {
+      passwordResetOtp: otpCode,
+      passwordResetOtpExpiresAt: expiresAt,
+    });
+
+    try {
+      await this.emailService.sendPasswordResetOtpEmail({
+        email: user.email,
+        name: user.displayName,
+        otpCode,
+        expiresInMinutes,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset OTP to ${user.email}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
     return { message: 'Password reset email sent if email exists' };
   }
 
-  async resetPassword(dto: any): Promise<{ message: string }> {
-    return { message: 'Password reset not implemented yet' };
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const user = await this.userRepository.findByEmail(dto.email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const storedOtp = user.passwordResetOtp;
+    const expiresAt = user.passwordResetOtpExpiresAt;
+    const now = new Date();
+
+    if (
+      !storedOtp ||
+      !expiresAt ||
+      storedOtp !== dto.otpCode ||
+      expiresAt <= now
+    ) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const newPasswordHash = await this.hashService.hash(dto.newPassword);
+
+    await this.userRepository.update(user.userId, {
+      passwordHash: newPasswordHash,
+      passwordResetOtp: null,
+      passwordResetOtpExpiresAt: null,
+    });
+
+    if (user.email) {
+      try {
+        await this.emailService.sendPasswordChangedEmail({
+          email: user.email,
+          name: user.displayName,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send password changed email to ${user.email}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
+    return { message: 'Password reset successfully' };
+  }
+
+  private generateOtpCode(): string {
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    return otp.toString();
+  }
+
+  private getOtpExpiryMinutes(): number {
+    const raw = this.configService.get<string>(
+      'RESET_PASSWORD_OTP_EXPIRES_MINUTES',
+      '10',
+    );
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
   }
 }

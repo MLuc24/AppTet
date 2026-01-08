@@ -31,6 +31,13 @@ export class UserRepository implements IUserRepository {
     return user ? this.toDomain(user) : null;
   }
 
+  async findByEmailVerificationToken(token: string): Promise<UserEntity | null> {
+    const user = await this.prisma.users.findUnique({
+      where: { email_verification_token: token },
+    });
+    return user ? this.toDomain(user) : null;
+  }
+
   async create(data: CreateUserData): Promise<UserEntity> {
     const user = await this.prisma.users.create({
       data: {
@@ -40,6 +47,7 @@ export class UserRepository implements IUserRepository {
         display_name: data.displayName,
         avatar_asset_id: data.avatarAssetId,
         email_verification_token: data.emailVerificationToken,
+        email_verified: data.emailVerified,
         status: data.status || UserStatus.ACTIVE,
         dob: data.dob,
         native_language_id: data.nativeLanguageId,
@@ -62,6 +70,13 @@ export class UserRepository implements IUserRepository {
       updateData.avatar_asset_id = data.avatarAssetId;
     if (data.emailVerificationToken !== undefined)
       updateData.email_verification_token = data.emailVerificationToken;
+    if (data.emailVerified !== undefined)
+      updateData.email_verified = data.emailVerified;
+    if (data.passwordResetOtp !== undefined)
+      updateData.password_reset_otp = data.passwordResetOtp;
+    if (data.passwordResetOtpExpiresAt !== undefined)
+      updateData.password_reset_otp_expires_at =
+        data.passwordResetOtpExpiresAt;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.dob !== undefined) updateData.dob = data.dob;
     if (data.nativeLanguageId !== undefined)
@@ -99,6 +114,10 @@ export class UserRepository implements IUserRepository {
       phone: prismaUser.phone || undefined,
       passwordHash: prismaUser.password_hash,
       displayName: prismaUser.display_name,
+      emailVerified: prismaUser.email_verified ?? false,
+      passwordResetOtp: prismaUser.password_reset_otp || undefined,
+      passwordResetOtpExpiresAt:
+        prismaUser.password_reset_otp_expires_at || undefined,
       avatarAssetId: prismaUser.avatar_asset_id || undefined,
       status: prismaUser.status as UserStatus,
       dob: prismaUser.dob || undefined,

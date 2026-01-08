@@ -16,6 +16,9 @@ export interface UserProps {
   phone?: string;
   passwordHash: string;
   displayName: string;
+  emailVerified?: boolean;
+  passwordResetOtp?: string;
+  passwordResetOtpExpiresAt?: Date;
   avatarAssetId?: string;
   status: UserStatus;
   dob?: Date;
@@ -52,6 +55,18 @@ export class UserEntity {
 
   get displayName(): string {
     return this.props.displayName;
+  }
+
+  get emailVerified(): boolean {
+    return this.props.emailVerified ?? false;
+  }
+
+  get passwordResetOtp(): string | undefined {
+    return this.props.passwordResetOtp;
+  }
+
+  get passwordResetOtpExpiresAt(): Date | undefined {
+    return this.props.passwordResetOtpExpiresAt;
   }
 
   get avatarAssetId(): string | undefined {

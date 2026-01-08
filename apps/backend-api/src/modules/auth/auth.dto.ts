@@ -11,6 +11,7 @@ import {
   Matches,
   IsOptional,
   IsNotEmpty,
+  Length,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -77,10 +78,16 @@ export class ForgotPasswordDto {
 }
 
 export class ResetPasswordDto {
-  @ApiProperty({ example: 'uuid-token-here' })
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
+  email: string;
+
+  @ApiProperty({ example: '123456', minLength: 6, maxLength: 6 })
   @IsString()
-  @IsNotEmpty({ message: 'Token is required' })
-  token: string;
+  @IsNotEmpty({ message: 'OTP is required' })
+  @Length(6, 6, { message: 'OTP must be 6 digits' })
+  otpCode: string;
 
   @ApiProperty({ example: 'NewSecurePass123!', minLength: 8 })
   @IsString()

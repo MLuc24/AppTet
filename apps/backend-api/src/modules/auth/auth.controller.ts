@@ -12,7 +12,9 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -106,12 +108,14 @@ export class AuthController {
     description: 'Invalid or expired token',
     type: ErrorResponseDto,
   })
-  async verifyEmail(@Query('token') token: string): Promise<unknown> {
-    const result = await this.authService.verifyEmail(token);
-    return {
-      success: true,
-      data: result,
-    };
+  async verifyEmail(
+    @Query('token') token: string,
+    @Query('email') email: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const result = await this.authService.verifyEmail(token, email);
+    const html = buildVerificationHtml(result.status);
+    res.status(HttpStatus.OK).type('text/html').send(html);
   }
 
   @Public()
@@ -237,4 +241,96 @@ export class AuthController {
       data: user,
     };
   }
+}
+
+function buildVerificationHtml(
+  status: 'verified' | 'already_verified' | 'invalid',
+): string {
+  const isVerified = status === 'verified';
+  const isAlready = status === 'already_verified';
+  const title = isVerified
+    ? 'Verification successful'
+    : isAlready
+      ? 'Email already verified'
+      : 'Invalid verification link';
+  const message = isVerified
+    ? 'Your email has been verified. You can sign in now.'
+    : isAlready
+      ? 'This email address was verified earlier. You can sign in normally.'
+      : 'This verification link is invalid or has expired.';
+  const tone = isVerified ? '#16a34a' : isAlready ? '#2563eb' : '#dc2626';
+  const icon = isVerified ? 'OK' : isAlready ? 'i' : '!';
+
+  return `<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f3f4f6;
+        color: #111827;
+      }
+      .wrap {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 520px;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        text-align: center;
+      }
+      .icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        border-radius: 999px;
+        background: ${tone};
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      p {
+        margin: 0 0 20px;
+        color: #4b5563;
+      }
+      .cta {
+        display: inline-block;
+        padding: 12px 20px;
+        border-radius: 10px;
+        background: #111827;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="icon">${icon}</div>
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <a class="cta" href="/">Go to homepage</a>
+      </div>
+    </div>
+  </body>
+</html>`;
 }

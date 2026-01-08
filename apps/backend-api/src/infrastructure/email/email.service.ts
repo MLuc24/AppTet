@@ -1,11 +1,11 @@
 /**
- * Email Service Implementation with Resend
+ * Email Service Implementation with SMTP (Gmail)
  * Infrastructure layer - implements IEmailService port
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import nodemailer, { Transporter } from 'nodemailer';
 import {
   IEmailService,
   SendEmailOptions,
@@ -23,13 +23,37 @@ export class EmailService implements IEmailService {
   private readonly appBaseUrl: string;
   private readonly verificationUrl: string;
   private readonly otpExpiresMinutes: number;
-  private readonly resendConfigured: boolean;
-  private readonly resendClient: Resend | null;
+  private readonly mailConfigured: boolean;
+  private readonly transporter: Transporter | null;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    this.resendConfigured = Boolean(apiKey);
-    this.resendClient = apiKey ? new Resend(apiKey) : null;
+    const host = this.configService.get<string>(
+      'MAIL_HOST',
+      'smtp.gmail.com',
+    );
+    const port = parseInt(
+      this.configService.get<string>('MAIL_PORT', '587'),
+      10,
+    );
+    const secure = this.configService.get<string>('MAIL_SECURE', '');
+    const resolvedSecure =
+      secure === ''
+        ? port === 465
+        : secure.toLowerCase() === 'true';
+    const user = this.configService.get<string>('MAIL_USER', '');
+    const pass = this.configService.get<string>('MAIL_PASSWORD', '');
+    this.mailConfigured = Boolean(user && pass);
+    this.transporter = this.mailConfigured
+      ? nodemailer.createTransport({
+          host,
+          port,
+          secure: resolvedSecure,
+          auth: {
+            user,
+            pass,
+          },
+        })
+      : null;
 
     this.fromEmail = this.configService.get<string>(
       'MAIL_FROM',
@@ -58,17 +82,17 @@ export class EmailService implements IEmailService {
       ? configuredOtpExpiry
       : 10;
 
-    if (!this.resendConfigured) {
+    if (!this.mailConfigured) {
       this.logger.warn(
-        'RESEND_API_KEY is not configured; emails will not be delivered.',
+        'MAIL_USER/MAIL_PASSWORD is not configured; emails will not be delivered.',
       );
     }
   }
 
   async sendEmail(options: SendEmailOptions): Promise<void> {
-    if (!this.resendConfigured || !this.resendClient) {
+    if (!this.mailConfigured || !this.transporter) {
       this.logger.warn(
-        `Skipping email send to ${options.to} because Resend is not configured.`,
+        `Skipping email send to ${options.to} because SMTP is not configured.`,
       );
       return;
     }
@@ -77,18 +101,13 @@ export class EmailService implements IEmailService {
       const from = this.fromName
         ? `${this.fromName} <${this.fromEmail}>`
         : this.fromEmail;
-      const { error } = await this.resendClient.emails.send({
+      await this.transporter.sendMail({
         from,
         to: options.to,
         subject: options.subject,
         html: options.html,
         text: options.text ?? this.fallbackText(options.html),
       });
-
-      if (error) {
-        this.logger.error(`Resend error: ${JSON.stringify(error)}`);
-        throw new Error(error.message || 'Resend email failed');
-      }
 
       this.logger.log(
         `Email sent to ${options.to} with subject "${options.subject}"`,
@@ -103,6 +122,7 @@ export class EmailService implements IEmailService {
     const verificationLink = this.buildVerificationLink(
       data.token,
       data.verificationLink,
+      data.email,
     );
 
     if (!verificationLink) {
@@ -201,6 +221,7 @@ export class EmailService implements IEmailService {
   private buildVerificationLink(
     token?: string,
     verificationLink?: string,
+    email?: string,
   ): string | null {
     if (verificationLink) {
       return verificationLink;
@@ -210,8 +231,12 @@ export class EmailService implements IEmailService {
       return null;
     }
 
-    const separator = this.verificationUrl.includes('?') ? '&' : '?';
-    return `${this.verificationUrl}${separator}token=${token}`;
+    const url = new URL(this.verificationUrl);
+    url.searchParams.set('token', token);
+    if (email) {
+      url.searchParams.set('email', email);
+    }
+    return url.toString();
   }
 
   private fallbackText(html: string): string {

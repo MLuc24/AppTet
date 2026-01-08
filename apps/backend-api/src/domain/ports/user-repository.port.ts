@@ -12,6 +12,7 @@ export interface CreateUserData {
   displayName: string;
   avatarAssetId?: string;
   emailVerificationToken?: string;
+  emailVerified?: boolean;
   status?: UserStatus;
   dob?: Date;
   nativeLanguageId?: number;
@@ -24,7 +25,10 @@ export interface UpdateUserData {
   passwordHash?: string;
   displayName?: string;
   avatarAssetId?: string;
-  emailVerificationToken?: string;
+  emailVerificationToken?: string | null;
+  emailVerified?: boolean;
+  passwordResetOtp?: string | null;
+  passwordResetOtpExpiresAt?: Date | null;
   status?: UserStatus;
   dob?: Date;
   nativeLanguageId?: number;
@@ -37,6 +41,7 @@ export interface IUserRepository {
   findById(userId: string): Promise<UserEntity | null>;
   findByEmail(email: string): Promise<UserEntity | null>;
   findByPhone(phone: string): Promise<UserEntity | null>;
+  findByEmailVerificationToken(token: string): Promise<UserEntity | null>;
 
   // Command methods
   create(data: CreateUserData): Promise<UserEntity>;
