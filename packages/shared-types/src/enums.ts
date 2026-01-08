@@ -1,7 +1,15 @@
 export enum UserRole {
-  USER = 'user',
-  ADMIN = 'admin',
-  CONTENT_ADMIN = 'content_admin',
+  STUDENT = 'STUDENT',
+  INSTRUCTOR = 'INSTRUCTOR',
+  ADMIN = 'ADMIN',
+  CONTENT_EDITOR = 'CONTENT_EDITOR',
+  MODERATOR = 'MODERATOR',
+}
+
+export enum UserStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  DELETED = 'deleted',
 }
 
 export enum CourseLevel {

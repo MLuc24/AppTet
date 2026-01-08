@@ -1,12 +1,14 @@
-import { UserRole, CourseLevel, LessonType, ExerciseType, ProgressStatus } from './enums';
+import { UserRole, UserStatus, CourseLevel, LessonType, ExerciseType, ProgressStatus } from './enums';
 
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatarUrl?: string;
-  role: UserRole;
-  createdAt: string;
+  userId: string;
+  email?: string;
+  phone?: string;
+  displayName: string;
+  avatarAssetId?: string;
+  status: UserStatus;
+  lastLoginAt?: Date;
+  createdAt: Date;
 }
 
 export interface Course {
