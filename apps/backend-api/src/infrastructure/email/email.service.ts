@@ -5,202 +5,216 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
 import {
   IEmailService,
   SendEmailOptions,
   EmailVerificationData,
-  PasswordResetData,
+  PasswordResetOtpData,
+  WelcomeEmailData,
+  PasswordChangedData,
 } from '../../domain/ports/email-service.port';
 
 @Injectable()
 export class EmailService implements IEmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly fromEmail: string;
-  private readonly frontendUrl: string;
+  private readonly fromName: string;
+  private readonly appBaseUrl: string;
+  private readonly verificationUrl: string;
+  private readonly otpExpiresMinutes: number;
+  private readonly resendConfigured: boolean;
+  private readonly resendClient: Resend | null;
 
   constructor(private readonly configService: ConfigService) {
-    this.fromEmail = this.configService.get(
-      'EMAIL_FROM',
-      'noreply@yourapp.com',
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    this.resendConfigured = Boolean(apiKey);
+    this.resendClient = apiKey ? new Resend(apiKey) : null;
+
+    this.fromEmail = this.configService.get<string>(
+      'MAIL_FROM',
+      'noreply@example.com',
     );
-    this.frontendUrl = this.configService.get(
-      'FRONTEND_URL',
-      'http://localhost:3001',
+    this.fromName = this.configService.get<string>(
+      'MAIL_FROM_NAME',
+      'LMS Platform',
     );
+    this.appBaseUrl = this.configService.get<string>(
+      'APP_URL',
+      'http://localhost:3000',
+    );
+    this.verificationUrl = this.configService.get<string>(
+      'EMAIL_VERIFICATION_URL',
+      `${this.appBaseUrl}/api/v1/auth/verify-email`,
+    );
+    const configuredOtpExpiry = parseInt(
+      this.configService.get<string>(
+        'RESET_PASSWORD_OTP_EXPIRES_MINUTES',
+        '10',
+      ),
+      10,
+    );
+    this.otpExpiresMinutes = Number.isFinite(configuredOtpExpiry)
+      ? configuredOtpExpiry
+      : 10;
+
+    if (!this.resendConfigured) {
+      this.logger.warn(
+        'RESEND_API_KEY is not configured; emails will not be delivered.',
+      );
+    }
   }
 
-  sendEmail(options: SendEmailOptions): Promise<void> {
-    // TODO: Integrate with Resend API
-    // For MVP, we just log the email
-    this.logger.log(`[EMAIL] To: ${options.to}, Subject: ${options.subject}`);
-    this.logger.debug(`[EMAIL] HTML: ${options.html}`);
+  async sendEmail(options: SendEmailOptions): Promise<void> {
+    if (!this.resendConfigured || !this.resendClient) {
+      this.logger.warn(
+        `Skipping email send to ${options.to} because Resend is not configured.`,
+      );
+      return;
+    }
 
-    // Uncomment when ready to integrate Resend:
-    /*
-    const resend = new Resend(this.configService.get('RESEND_API_KEY'));
-    await resend.emails.send({
-      from: this.fromEmail,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-    });
-    */
-    return Promise.resolve();
+    try {
+      const from = this.fromName
+        ? `${this.fromName} <${this.fromEmail}>`
+        : this.fromEmail;
+      const { error } = await this.resendClient.emails.send({
+        from,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text ?? this.fallbackText(options.html),
+      });
+
+      if (error) {
+        this.logger.error(`Resend error: ${JSON.stringify(error)}`);
+        throw new Error(error.message || 'Resend email failed');
+      }
+
+      this.logger.log(
+        `Email sent to ${options.to} with subject "${options.subject}"`,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to send email: ${error?.message ?? error}`);
+      throw error;
+    }
   }
 
   async sendVerificationEmail(data: EmailVerificationData): Promise<void> {
-    const subject = 'Verify your email address';
+    const verificationLink = this.buildVerificationLink(
+      data.token,
+      data.verificationLink,
+    );
+
+    if (!verificationLink) {
+      throw new Error(
+        'Verification token or link is required to send email verification.',
+      );
+    }
+
+    const subject = 'Verify your email to activate your account';
+    const recipientName = data.name || 'there';
     const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .button { 
-              display: inline-block; 
-              padding: 12px 24px; 
-              background-color: #007bff; 
-              color: white; 
-              text-decoration: none; 
-              border-radius: 4px; 
-              margin: 20px 0;
-            }
-            .footer { margin-top: 40px; font-size: 12px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>Welcome, ${data.name}!</h2>
-            <p>Thank you for registering. Please verify your email address to activate your account.</p>
-            <a href="${data.verificationLink}" class="button">Verify Email Address</a>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #666;">${data.verificationLink}</p>
-            <p>This link will expire in 24 hours.</p>
-            <div class="footer">
-              <p>If you didn't create an account, you can safely ignore this email.</p>
-            </div>
-          </div>
-        </body>
-      </html>
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin-bottom: 12px; color: #111827;">Hi ${recipientName},</h2>
+        <p style="margin: 0 0 16px;">Thanks for signing up. Please confirm your email so we can secure your account.</p>
+        <a href="${verificationLink}" style="display: inline-block; padding: 12px 20px; background: #2563eb; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 600;">Verify email</a>
+        <p style="margin: 16px 0 8px;">If the button doesn't work, copy this link:</p>
+        <p style="margin: 0 0 8px; color: #4b5563; word-break: break-all;">${verificationLink}</p>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #6b7280;">This link expires in 24 hours.</p>
+      </div>
     `;
 
     await this.sendEmail({
       to: data.email,
       subject,
       html,
-      text: `Welcome, ${data.name}! Please verify your email: ${data.verificationLink}`,
+      text: `Hi ${recipientName}, confirm your email by opening ${verificationLink}`,
     });
   }
 
-  async sendPasswordResetEmail(data: PasswordResetData): Promise<void> {
-    const subject = 'Reset your password';
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
+    const subject = 'Welcome aboard!';
+    const recipientName = data.name || 'there';
     const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .button { 
-              display: inline-block; 
-              padding: 12px 24px; 
-              background-color: #dc3545; 
-              color: white; 
-              text-decoration: none; 
-              border-radius: 4px; 
-              margin: 20px 0;
-            }
-            .footer { margin-top: 40px; font-size: 12px; color: #666; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>Password Reset Request</h2>
-            <p>Hi ${data.name},</p>
-            <p>You requested to reset your password. Click the button below to create a new password:</p>
-            <a href="${data.resetLink}" class="button">Reset Password</a>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #666;">${data.resetLink}</p>
-            <p>This link will expire in 1 hour.</p>
-            <div class="footer">
-              <p>If you didn't request a password reset, you can safely ignore this email.</p>
-            </div>
-          </div>
-        </body>
-      </html>
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin-bottom: 8px;">Welcome, ${recipientName}!</h2>
+        <p style="margin: 0 0 12px;">Your email has been verified successfully.</p>
+        <p style="margin: 0 0 12px;">You can now sign in and start learning.</p>
+        <p style="margin: 0;">Visit <a href="${this.appBaseUrl}" style="color: #2563eb; text-decoration: none;">${this.appBaseUrl}</a> to get started.</p>
+      </div>
     `;
 
     await this.sendEmail({
       to: data.email,
       subject,
       html,
-      text: `Password reset requested. Reset link: ${data.resetLink}`,
+      text: `Welcome, ${recipientName}! Your email has been verified. Visit ${this.appBaseUrl} to get started.`,
     });
   }
 
-  async sendWelcomeEmail(email: string, name: string): Promise<void> {
-    const subject = 'Welcome to our platform!';
+  async sendPasswordResetOtpEmail(data: PasswordResetOtpData): Promise<void> {
+    const otpCode = data.otpCode?.toString().padStart(6, '0');
+    if (!otpCode) {
+      throw new Error('OTP code is required to send password reset email.');
+    }
+
+    const expiresIn = data.expiresInMinutes ?? this.otpExpiresMinutes;
+    const recipientName = data.name || 'there';
+    const subject = 'Your password reset code';
     const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>Welcome, ${name}!</h2>
-            <p>Your email has been verified successfully.</p>
-            <p>You can now start using our platform to learn languages.</p>
-            <p>Happy learning!</p>
-          </div>
-        </body>
-      </html>
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin-bottom: 12px;">Reset your password</h2>
+        <p style="margin: 0 0 12px;">Use this 6-digit code to continue resetting your password:</p>
+        <div style="display: inline-block; padding: 12px 20px; background: #f3f4f6; border-radius: 8px; font-size: 24px; font-weight: 700; letter-spacing: 4px; margin: 8px 0 16px;">${otpCode}</div>
+        <p style="margin: 0 0 12px;">The code expires in ${expiresIn} minutes.</p>
+        <p style="margin: 0; font-size: 12px; color: #6b7280;">If you didn't request this, you can ignore this email.</p>
+      </div>
     `;
 
     await this.sendEmail({
-      to: email,
+      to: data.email,
       subject,
       html,
-      text: `Welcome, ${name}! Your email has been verified.`,
+      text: `Use this code to reset your password: ${otpCode} (expires in ${expiresIn} minutes).`,
     });
   }
 
-  async sendPasswordChangedEmail(email: string, name: string): Promise<void> {
-    const subject = 'Your password was changed';
+  async sendPasswordChangedEmail(data: PasswordChangedData): Promise<void> {
+    const subject = 'Your password was updated';
+    const recipientName = data.name || 'there';
     const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>Password Changed</h2>
-            <p>Hi ${name},</p>
-            <p>Your password was successfully changed.</p>
-            <p>If you didn't make this change, please contact support immediately.</p>
-          </div>
-        </body>
-      </html>
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin-bottom: 8px;">Password updated</h2>
+        <p style="margin: 0 0 12px;">Hi ${recipientName}, your password was changed successfully.</p>
+        <p style="margin: 0;">If this wasn't you, please reset your password immediately.</p>
+      </div>
     `;
 
     await this.sendEmail({
-      to: email,
+      to: data.email,
       subject,
       html,
-      text: `Hi ${name}, your password was successfully changed.`,
+      text: `Hi ${recipientName}, your password was changed. If this wasn't you, reset it immediately.`,
     });
+  }
+
+  private buildVerificationLink(
+    token?: string,
+    verificationLink?: string,
+  ): string | null {
+    if (verificationLink) {
+      return verificationLink;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    const separator = this.verificationUrl.includes('?') ? '&' : '?';
+    return `${this.verificationUrl}${separator}token=${token}`;
+  }
+
+  private fallbackText(html: string): string {
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 }

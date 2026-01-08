@@ -17,7 +17,10 @@ import {
   SESSION_REPOSITORY,
   TOKEN_SERVICE,
   HASH_SERVICE,
+  EMAIL_SERVICE,
 } from './auth.constants';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
 
 // Infrastructure Implementations
 import { UserRepository } from '../../infrastructure/database/repositories/user.repository';
@@ -28,6 +31,7 @@ import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service
 
 @Module({
   imports: [
+    EmailModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -81,6 +85,10 @@ import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service
     {
       provide: HASH_SERVICE,
       useClass: BcryptHashService,
+    },
+    {
+      provide: EMAIL_SERVICE,
+      useExisting: EmailService,
     },
   ],
   exports: [AuthService, JwtStrategy, PassportModule],

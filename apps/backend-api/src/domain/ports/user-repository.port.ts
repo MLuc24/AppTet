@@ -11,6 +11,7 @@ export interface CreateUserData {
   passwordHash: string;
   displayName: string;
   avatarAssetId?: string;
+  emailVerificationToken?: string;
   status?: UserStatus;
   dob?: Date;
   nativeLanguageId?: number;
@@ -23,6 +24,7 @@ export interface UpdateUserData {
   passwordHash?: string;
   displayName?: string;
   avatarAssetId?: string;
+  emailVerificationToken?: string;
   status?: UserStatus;
   dob?: Date;
   nativeLanguageId?: number;

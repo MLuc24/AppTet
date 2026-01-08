@@ -1,3 +1,6 @@
+-- Enable extensions required by defaults
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "auth";
 

@@ -39,6 +39,7 @@ export class UserRepository implements IUserRepository {
         password_hash: data.passwordHash,
         display_name: data.displayName,
         avatar_asset_id: data.avatarAssetId,
+        email_verification_token: data.emailVerificationToken,
         status: data.status || UserStatus.ACTIVE,
         dob: data.dob,
         native_language_id: data.nativeLanguageId,
@@ -59,6 +60,8 @@ export class UserRepository implements IUserRepository {
       updateData.display_name = data.displayName;
     if (data.avatarAssetId !== undefined)
       updateData.avatar_asset_id = data.avatarAssetId;
+    if (data.emailVerificationToken !== undefined)
+      updateData.email_verification_token = data.emailVerificationToken;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.dob !== undefined) updateData.dob = data.dob;
     if (data.nativeLanguageId !== undefined)

@@ -12,14 +12,26 @@ export interface SendEmailOptions {
 
 export interface EmailVerificationData {
   email: string;
-  name: string;
-  verificationLink: string;
+  name?: string;
+  token?: string;
+  verificationLink?: string;
 }
 
-export interface PasswordResetData {
+export interface PasswordResetOtpData {
   email: string;
-  name: string;
-  resetLink: string;
+  name?: string;
+  otpCode: string;
+  expiresInMinutes?: number;
+}
+
+export interface WelcomeEmailData {
+  email: string;
+  name?: string;
+}
+
+export interface PasswordChangedData {
+  email: string;
+  name?: string;
 }
 
 export abstract class IEmailService {
@@ -34,17 +46,21 @@ export abstract class IEmailService {
   abstract sendVerificationEmail(data: EmailVerificationData): Promise<void>;
 
   /**
-   * Send password reset email
+   * Send password reset OTP email
    */
-  abstract sendPasswordResetEmail(data: PasswordResetData): Promise<void>;
+  abstract sendPasswordResetOtpEmail(
+    data: PasswordResetOtpData,
+  ): Promise<void>;
 
   /**
    * Send welcome email after registration
    */
-  abstract sendWelcomeEmail(email: string, name: string): Promise<void>;
+  abstract sendWelcomeEmail(data: WelcomeEmailData): Promise<void>;
 
   /**
    * Send password changed confirmation
    */
-  abstract sendPasswordChangedEmail(email: string, name: string): Promise<void>;
+  abstract sendPasswordChangedEmail(
+    data: PasswordChangedData,
+  ): Promise<void>;
 }

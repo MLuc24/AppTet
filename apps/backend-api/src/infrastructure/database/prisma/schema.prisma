@@ -103,6 +103,7 @@ model users {
   phone                                            String?               @unique @db.VarChar(50)
   password_hash                                    String                @db.VarChar(255)
   display_name                                     String                @db.VarChar(255)
+  email_verification_token                         String?               @unique @db.VarChar(255)
   avatar_asset_id                                  String?               @db.Uuid
   status                                           user_status           @default(active)
   dob                                              DateTime?             @db.Date

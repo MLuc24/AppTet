@@ -10,6 +10,7 @@ import { IRoleRepository } from '../../domain/ports/role-repository.port';
 import { ISessionRepository } from '../../domain/ports/session-repository.port';
 import { ITokenService } from '../../domain/ports/token-service.port';
 import { IHashService } from '../../domain/ports/hash-service.port';
+import { IEmailService } from '../../domain/ports/email-service.port';
 import {
   RegisterDto,
   LoginDto,
@@ -22,6 +23,7 @@ import {
   SESSION_REPOSITORY,
   TOKEN_SERVICE,
   HASH_SERVICE,
+  EMAIL_SERVICE,
 } from './auth.constants';
 
 @Injectable()
@@ -39,6 +41,8 @@ export class AuthService {
     private readonly tokenService: ITokenService,
     @Inject(HASH_SERVICE)
     private readonly hashService: IHashService,
+    @Inject(EMAIL_SERVICE)
+    private readonly emailService: IEmailService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -73,18 +77,38 @@ export class AuthService {
     // Hash password
     const passwordHash = await this.hashService.hash(dto.password);
 
+    const emailVerificationToken = dto.email
+      ? this.hashService.generateToken()
+      : undefined;
+
     // Create user
     const user = await this.userRepository.create({
       email: dto.email,
       phone: dto.phone,
       passwordHash,
       displayName: dto.displayName,
+      emailVerificationToken,
     });
 
     // Assign default role (STUDENT)
     const studentRole = await this.roleRepository.findByCode('STUDENT');
     if (studentRole) {
       await this.roleRepository.assignRoleToUser(user.userId, studentRole.roleId);
+    }
+
+    if (user.email && emailVerificationToken) {
+      try {
+        await this.emailService.sendVerificationEmail({
+          email: user.email,
+          name: user.displayName,
+          token: emailVerificationToken,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send verification email to ${user.email}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
 
     return {

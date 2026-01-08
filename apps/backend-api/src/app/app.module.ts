@@ -11,6 +11,7 @@ import { LessonModule } from '../modules/lesson/lesson.module';
 import { LearningModule } from '../modules/learning/learning.module';
 import { AiModule } from '../modules/ai/ai.module';
 import { NotificationModule } from '../modules/notification/notification.module';
+import { EmailModule } from '../modules/email/email.module';
 
 // Global guards, filters, interceptors
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -25,6 +26,7 @@ import { TransformInterceptor } from '../common/interceptors/transform.intercept
       envFilePath: ['apps/backend-api/.env', '.env', '.env.local'],
     }),
 
+    EmailModule,
     AuthModule,
     UserModule,
     CourseModule,
