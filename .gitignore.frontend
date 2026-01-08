@@ -1,0 +1,81 @@
+# ============================================
+# FRONTEND REPO - Ignore Backend
+# ============================================
+
+# Ignore Backend Apps
+apps/backend-api/
+
+# Ignore Infrastructure
+infrastructure/
+docker-compose.yml
+scripts/db-*.sh
+scripts/db-*.ps1
+scripts/seed-data.ts
+
+# Ignore Backend Docs
+docs/BACKEND_GUIDELINES.md
+docs/DATABASE_SCHEMA.md
+docs/AUTH_*.md
+docs/DATABASE_AUTH_SETUP.md
+
+# Keep only frontend
+# apps/mobile-app/ ← NOT ignored
+# apps/admin-web/ ← NOT ignored
+
+# ============================================
+# Common Ignores
+# ============================================
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Environment
+.env
+.env*.local
+
+# Build outputs
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+*.pem
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+
+# Generated native folders
+ios/
+android/
