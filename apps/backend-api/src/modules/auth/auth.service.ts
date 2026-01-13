@@ -4,6 +4,7 @@
  */
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import {
   Injectable,
   Logger,
@@ -15,16 +16,16 @@ import { createHash } from 'crypto';
 =======
 import { Injectable, Logger, UnauthorizedException, ConflictException, Inject } from '@nestjs/common';
 >>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
+=======
+import { Injectable, Logger, UnauthorizedException, ConflictException, Inject } from '@nestjs/common';
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
 import { ConfigService } from '@nestjs/config';
 import { IUserRepository } from '../../domain/ports/user-repository.port';
 import { IRoleRepository } from '../../domain/ports/role-repository.port';
 import { ISessionRepository } from '../../domain/ports/session-repository.port';
-import { IDeviceRepository } from '../../domain/ports/device-repository.port';
-import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
 import { ITokenService } from '../../domain/ports/token-service.port';
 import { IHashService } from '../../domain/ports/hash-service.port';
 import { IEmailService } from '../../domain/ports/email-service.port';
-import { DeviceEntity } from '../../domain/entities/device.entity';
 import {
   RegisterDto,
   LoginDto,
@@ -37,8 +38,6 @@ import {
   USER_REPOSITORY,
   ROLE_REPOSITORY,
   SESSION_REPOSITORY,
-  DEVICE_REPOSITORY,
-  REFRESH_TOKEN_REPOSITORY,
   TOKEN_SERVICE,
   HASH_SERVICE,
   EMAIL_SERVICE,
@@ -55,10 +54,6 @@ export class AuthService {
     private readonly roleRepository: IRoleRepository,
     @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: ISessionRepository,
-    @Inject(DEVICE_REPOSITORY)
-    private readonly deviceRepository: IDeviceRepository,
-    @Inject(REFRESH_TOKEN_REPOSITORY)
-    private readonly refreshTokenRepository: IRefreshTokenRepository,
     @Inject(TOKEN_SERVICE)
     private readonly tokenService: ITokenService,
     @Inject(HASH_SERVICE)
@@ -73,8 +68,11 @@ export class AuthService {
    */
   async register(
     dto: RegisterDto,
+<<<<<<< HEAD
     ip?: string,
     userAgent?: string,
+=======
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
   ): Promise<{ user: UserResponseDto; message: string }> {
     this.logger.log(`Registering user: ${dto.email || dto.phone}`);
 
@@ -118,6 +116,7 @@ export class AuthService {
     const studentRole = await this.roleRepository.findByCode('STUDENT');
     if (studentRole) {
       await this.roleRepository.assignRoleToUser(user.userId, studentRole.roleId);
+<<<<<<< HEAD
     }
 
     // Create device if device info provided
@@ -137,6 +136,8 @@ export class AuthService {
       });
 
       this.logger.log(`Device registered for user ${user.userId}: ${dto.platform}`);
+=======
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
     }
 
     if (user.email && emailVerificationToken) {
@@ -163,11 +164,7 @@ export class AuthService {
   /**
    * Login with email/phone and password
    */
-  async login(
-    dto: LoginDto,
-    ip?: string,
-    userAgent?: string,
-  ): Promise<AuthTokensResponseDto> {
+  async login(dto: LoginDto): Promise<AuthTokensResponseDto> {
     this.logger.log(`Login attempt: ${dto.email || dto.phone}`);
 
     // Validate: at least email or phone required
@@ -208,6 +205,7 @@ export class AuthService {
       lastLoginAt: updatedUser.lastLoginAt,
     });
 
+<<<<<<< HEAD
     // Handle device registration/update
     let deviceId: string | undefined;
     if (dto.platform) {
@@ -246,6 +244,8 @@ export class AuthService {
       deviceId = device.id;
     }
 
+=======
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
     // Generate tokens
     const accessToken = await this.tokenService.generateAccessToken({
       sub: user.userId,
@@ -262,15 +262,13 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes
 
-    const session = await this.sessionRepository.create({
+    await this.sessionRepository.create({
       userId: user.userId,
-      deviceId,
-      ip,
-      userAgent,
       accessTokenHash,
       expiresAt,
     });
 
+<<<<<<< HEAD
     // Save refresh token to database
     const refreshTokenHash = this.hashToken(refreshToken);
     const refreshExpiresAt = new Date();
@@ -284,6 +282,8 @@ export class AuthService {
 
     this.logger.log(`Login successful for user ${user.userId}, session ${session.sessionId}`);
 
+=======
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
     return {
       accessToken,
       refreshToken,
@@ -302,6 +302,7 @@ export class AuthService {
     try {
       const payload = await this.tokenService.verifyRefreshToken(refreshToken);
 
+<<<<<<< HEAD
       // Verify the refresh token exists in database and is valid
 <<<<<<< HEAD
       const refreshTokenHash = this.hashToken(refreshToken);
@@ -317,6 +318,8 @@ export class AuthService {
       }
 
       // Verify user still exists and is active
+=======
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
       const user = await this.userRepository.findById(payload.sub);
       if (!user || !user.isActive()) {
         throw new UnauthorizedException('Invalid token');
@@ -332,7 +335,6 @@ export class AuthService {
         accessToken,
         expiresIn: 900,
       };
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
@@ -342,6 +344,7 @@ export class AuthService {
    * Logout - revoke session
    */
   async logout(refreshToken: string): Promise<{ message: string }> {
+<<<<<<< HEAD
     try {
       // Hash the refresh token to find it in database
 <<<<<<< HEAD
@@ -369,6 +372,13 @@ export class AuthService {
       // Don't throw error on logout, just return success
       return { message: 'Logged out successfully' };
     }
+=======
+    // In a real implementation, you would:
+    // 1. Verify the refresh token
+    // 2. Find and revoke the associated session
+    // For now, just return success
+    return { message: 'Logged out successfully' };
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
   }
 
   /**
@@ -485,6 +495,7 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.userRepository.findByEmail(dto.email);
 <<<<<<< HEAD
+<<<<<<< HEAD
     // Always return success message for security (prevent email enumeration)
     // But only send email if user exists
     if (user && user.email) {
@@ -497,6 +508,11 @@ export class AuthService {
       return { message: 'Password reset email sent if email exists' };
     }
 >>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
+=======
+    if (!user || !user.email) {
+      return { message: 'Password reset email sent if email exists' };
+    }
+>>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
 
     const otpCode = this.generateOtpCode();
     const expiresInMinutes = this.getOtpExpiryMinutes();
@@ -581,9 +597,5 @@ export class AuthService {
     );
     const parsed = parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
-  }
-
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
   }
 }
