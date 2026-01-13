@@ -191,13 +191,6 @@ export class LogoutDto {
   refreshToken: string;
 }
 
-export class CheckEmailDto {
-  @ApiProperty({ example: 'user@example.com' })
-  @IsEmail({}, { message: 'Invalid email format' })
-  @IsNotEmpty({ message: 'Email is required' })
-  email: string;
-}
-
 // ============ RESPONSE DTOs ============
 
 export class UserResponseDto {

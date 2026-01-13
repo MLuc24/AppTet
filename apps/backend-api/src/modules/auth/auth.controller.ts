@@ -30,7 +30,6 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
   LogoutDto,
-  CheckEmailDto,
   RegisterResponseDto,
   LoginResponseDto,
   RefreshTokenResponseDto,
@@ -138,22 +137,6 @@ export class AuthController {
   })
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<unknown> {
     const result = await this.authService.forgotPassword(dto);
-    return {
-      success: true,
-      data: result,
-    };
-  }
-
-  @Public()
-  @Post('check-email')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Check if email exists (for password reset)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Email existence check',
-  })
-  async checkEmail(@Body() dto: CheckEmailDto): Promise<unknown> {
-    const result = await this.authService.checkEmailExists(dto.email);
     return {
       success: true,
       data: result,
