@@ -3,8 +3,6 @@
  * Orchestrates authentication business logic
  */
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 import {
   Injectable,
   Logger,
@@ -13,12 +11,6 @@ import {
   Inject,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
-=======
-import { Injectable, Logger, UnauthorizedException, ConflictException, Inject } from '@nestjs/common';
->>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
-=======
-import { Injectable, Logger, UnauthorizedException, ConflictException, Inject } from '@nestjs/common';
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
 import { ConfigService } from '@nestjs/config';
 import { IUserRepository } from '../../domain/ports/user-repository.port';
 import { IRoleRepository } from '../../domain/ports/role-repository.port';
@@ -26,6 +18,9 @@ import { ISessionRepository } from '../../domain/ports/session-repository.port';
 import { ITokenService } from '../../domain/ports/token-service.port';
 import { IHashService } from '../../domain/ports/hash-service.port';
 import { IEmailService } from '../../domain/ports/email-service.port';
+import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
+import { IDeviceRepository } from '../../domain/ports/device-repository.port';
+import { DeviceEntity } from '../../domain/entities/device.entity';
 import {
   RegisterDto,
   LoginDto,
@@ -38,6 +33,8 @@ import {
   USER_REPOSITORY,
   ROLE_REPOSITORY,
   SESSION_REPOSITORY,
+  REFRESH_TOKEN_REPOSITORY,
+  DEVICE_REPOSITORY,
   TOKEN_SERVICE,
   HASH_SERVICE,
   EMAIL_SERVICE,
@@ -54,6 +51,10 @@ export class AuthService {
     private readonly roleRepository: IRoleRepository,
     @Inject(SESSION_REPOSITORY)
     private readonly sessionRepository: ISessionRepository,
+    @Inject(REFRESH_TOKEN_REPOSITORY)
+    private readonly refreshTokenRepository: IRefreshTokenRepository,
+    @Inject(DEVICE_REPOSITORY)
+    private readonly deviceRepository: IDeviceRepository,
     @Inject(TOKEN_SERVICE)
     private readonly tokenService: ITokenService,
     @Inject(HASH_SERVICE)
@@ -68,13 +69,13 @@ export class AuthService {
    */
   async register(
     dto: RegisterDto,
-<<<<<<< HEAD
     ip?: string,
     userAgent?: string,
-=======
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
   ): Promise<{ user: UserResponseDto; message: string }> {
-    this.logger.log(`Registering user: ${dto.email || dto.phone}`);
+    const originInfo = [ip, userAgent].filter(Boolean).join(' | ');
+    this.logger.log(
+      `Registering user: ${dto.email || dto.phone}${originInfo ? ` (${originInfo})` : ''}`,
+    );
 
     // Validate: at least email or phone required
     if (!dto.email && !dto.phone) {
@@ -115,15 +116,22 @@ export class AuthService {
     // Assign default role (STUDENT)
     const studentRole = await this.roleRepository.findByCode('STUDENT');
     if (studentRole) {
-      await this.roleRepository.assignRoleToUser(user.userId, studentRole.roleId);
-<<<<<<< HEAD
+      await this.roleRepository.assignRoleToUser(
+        user.userId,
+        studentRole.roleId,
+      );
     }
 
     // Create device if device info provided
     if (dto.platform) {
-      const deviceFingerprint = dto.deviceModel || dto.osVersion
-        ? DeviceEntity.generateFingerprint(dto.platform, dto.deviceModel, dto.osVersion)
-        : undefined;
+      const deviceFingerprint =
+        dto.deviceModel || dto.osVersion
+          ? DeviceEntity.generateFingerprint(
+              dto.platform,
+              dto.deviceModel,
+              dto.osVersion,
+            )
+          : undefined;
 
       await this.deviceRepository.create({
         userId: user.userId,
@@ -135,9 +143,9 @@ export class AuthService {
         locale: dto.locale,
       });
 
-      this.logger.log(`Device registered for user ${user.userId}: ${dto.platform}`);
-=======
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
+      this.logger.log(
+        `Device registered for user ${user.userId}: ${dto.platform}`,
+      );
     }
 
     if (user.email && emailVerificationToken) {
@@ -164,7 +172,11 @@ export class AuthService {
   /**
    * Login with email/phone and password
    */
-  async login(dto: LoginDto): Promise<AuthTokensResponseDto> {
+  async login(
+    dto: LoginDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthTokensResponseDto> {
     this.logger.log(`Login attempt: ${dto.email || dto.phone}`);
 
     // Validate: at least email or phone required
@@ -205,17 +217,24 @@ export class AuthService {
       lastLoginAt: updatedUser.lastLoginAt,
     });
 
-<<<<<<< HEAD
     // Handle device registration/update
     let deviceId: string | undefined;
     if (dto.platform) {
-      const deviceFingerprint = dto.deviceModel || dto.osVersion
-        ? DeviceEntity.generateFingerprint(dto.platform, dto.deviceModel, dto.osVersion)
-        : undefined;
+      const deviceFingerprint =
+        dto.deviceModel || dto.osVersion
+          ? DeviceEntity.generateFingerprint(
+              dto.platform,
+              dto.deviceModel,
+              dto.osVersion,
+            )
+          : undefined;
 
       // Try to find existing device by fingerprint
       let device = deviceFingerprint
-        ? await this.deviceRepository.findByFingerprint(user.userId, deviceFingerprint)
+        ? await this.deviceRepository.findByFingerprint(
+            user.userId,
+            deviceFingerprint,
+          )
         : null;
 
       if (device) {
@@ -238,14 +257,14 @@ export class AuthService {
           deviceFingerprint,
           locale: dto.locale,
         });
-        this.logger.log(`New device registered for user ${user.userId}: ${device.id}`);
+        this.logger.log(
+          `New device registered for user ${user.userId}: ${device.id}`,
+        );
       }
 
       deviceId = device.id;
     }
 
-=======
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
     // Generate tokens
     const accessToken = await this.tokenService.generateAccessToken({
       sub: user.userId,
@@ -262,13 +281,15 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes
 
-    await this.sessionRepository.create({
+    const session = await this.sessionRepository.create({
       userId: user.userId,
+      deviceId,
       accessTokenHash,
+      ip,
+      userAgent,
       expiresAt,
     });
 
-<<<<<<< HEAD
     // Save refresh token to database
     const refreshTokenHash = this.hashToken(refreshToken);
     const refreshExpiresAt = new Date();
@@ -280,10 +301,10 @@ export class AuthService {
       expiresAt: refreshExpiresAt,
     });
 
-    this.logger.log(`Login successful for user ${user.userId}, session ${session.sessionId}`);
+    this.logger.log(
+      `Login successful for user ${user.userId}, session ${session.sessionId}`,
+    );
 
-=======
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
     return {
       accessToken,
       refreshToken,
@@ -297,29 +318,22 @@ export class AuthService {
    */
   async refreshAccessToken(refreshToken: string): Promise<{
     accessToken: string;
+    refreshToken: string;
     expiresIn: number;
   }> {
     try {
       const payload = await this.tokenService.verifyRefreshToken(refreshToken);
 
-<<<<<<< HEAD
       // Verify the refresh token exists in database and is valid
-<<<<<<< HEAD
       const refreshTokenHash = this.hashToken(refreshToken);
       const storedToken =
         await this.refreshTokenRepository.findByTokenHash(refreshTokenHash);
-=======
-      const refreshTokenHash = await this.hashService.hash(refreshToken);
-      const storedToken = await this.refreshTokenRepository.findByTokenHash(refreshTokenHash);
->>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
 
       if (!storedToken || !storedToken.isValid()) {
         throw new UnauthorizedException('Invalid or expired refresh token');
       }
 
       // Verify user still exists and is active
-=======
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
       const user = await this.userRepository.findById(payload.sub);
       if (!user || !user.isActive()) {
         throw new UnauthorizedException('Invalid token');
@@ -333,9 +347,10 @@ export class AuthService {
 
       return {
         accessToken,
+        refreshToken,
         expiresIn: 900,
       };
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
@@ -344,17 +359,11 @@ export class AuthService {
    * Logout - revoke session
    */
   async logout(refreshToken: string): Promise<{ message: string }> {
-<<<<<<< HEAD
     try {
       // Hash the refresh token to find it in database
-<<<<<<< HEAD
       const tokenHash = this.hashToken(refreshToken);
       const storedToken =
         await this.refreshTokenRepository.findByTokenHash(tokenHash);
-=======
-      const tokenHash = await this.hashService.hash(refreshToken);
-      const storedToken = await this.refreshTokenRepository.findByTokenHash(tokenHash);
->>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
 
       if (storedToken) {
         // Revoke the refresh token
@@ -363,7 +372,9 @@ export class AuthService {
         // Revoke the associated session
         await this.sessionRepository.revoke(storedToken.sessionId);
 
-        this.logger.log(`Logout successful, session ${storedToken.sessionId} revoked`);
+        this.logger.log(
+          `Logout successful, session ${storedToken.sessionId} revoked`,
+        );
       }
 
       return { message: 'Logged out successfully' };
@@ -372,13 +383,6 @@ export class AuthService {
       // Don't throw error on logout, just return success
       return { message: 'Logged out successfully' };
     }
-=======
-    // In a real implementation, you would:
-    // 1. Verify the refresh token
-    // 2. Find and revoke the associated session
-    // For now, just return success
-    return { message: 'Logged out successfully' };
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
   }
 
   /**
@@ -443,6 +447,10 @@ export class AuthService {
     };
   }
 
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
   // Placeholder methods for compatibility
   async verifyEmail(
     token: string,
@@ -453,7 +461,8 @@ export class AuthService {
     }
 
     if (token) {
-      const user = await this.userRepository.findByEmailVerificationToken(token);
+      const user =
+        await this.userRepository.findByEmailVerificationToken(token);
       if (user) {
         if (user.emailVerified) {
           return { status: 'already_verified' };
@@ -494,25 +503,9 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.userRepository.findByEmail(dto.email);
-<<<<<<< HEAD
-<<<<<<< HEAD
-    // Always return success message for security (prevent email enumeration)
-    // But only send email if user exists
-    if (user && user.email) {
-      const otpCode = this.generateOtpCode();
-      const expiresInMinutes = this.getOtpExpiryMinutes();
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
-=======
     if (!user || !user.email) {
       return { message: 'Password reset email sent if email exists' };
     }
->>>>>>> parent of e0e1036 (feat(auth): Add email existence check endpoint for password reset flow)
-=======
-    if (!user || !user.email) {
-      return { message: 'Password reset email sent if email exists' };
-    }
->>>>>>> parent of 32db27e (Merge branch 'Auth' of https://github.com/MLuc24/AppTet into Auth)
 
     const otpCode = this.generateOtpCode();
     const expiresInMinutes = this.getOtpExpiryMinutes();
@@ -536,9 +529,28 @@ export class AuthService {
         `Failed to send password reset OTP to ${user.email}`,
         error instanceof Error ? error.stack : undefined,
       );
+
+      try {
+        await this.emailService.sendPasswordResetOtpEmail({
+          email: user.email,
+          name: user.displayName,
+          otpCode,
+          expiresInMinutes,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send password reset OTP to ${user.email}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
 
     return { message: 'Password reset email sent if email exists' };
+  }
+
+  async checkEmailExists(email: string): Promise<{ exists: boolean }> {
+    const user = await this.userRepository.findByEmail(email);
+    return { exists: !!user };
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {

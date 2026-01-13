@@ -137,6 +137,13 @@ export class ForgotPasswordDto {
   email: string;
 }
 
+export class CheckEmailDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail({}, { message: 'Invalid email format' })
+  @IsNotEmpty({ message: 'Email is required' })
+  email: string;
+}
+
 export class ResetPasswordDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail({}, { message: 'Invalid email format' })
