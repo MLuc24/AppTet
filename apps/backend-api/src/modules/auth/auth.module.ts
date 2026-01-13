@@ -15,6 +15,8 @@ import {
   USER_REPOSITORY,
   ROLE_REPOSITORY,
   SESSION_REPOSITORY,
+  REFRESH_TOKEN_REPOSITORY,
+  DEVICE_REPOSITORY,
   TOKEN_SERVICE,
   HASH_SERVICE,
   EMAIL_SERVICE,
@@ -26,6 +28,8 @@ import { EmailService } from '../email/email.service';
 import { UserRepository } from '../../infrastructure/database/repositories/user.repository';
 import { RoleRepository } from '../../infrastructure/database/repositories/role.repository';
 import { SessionRepository } from '../../infrastructure/database/repositories/session.repository';
+import { RefreshTokenRepository } from '../../infrastructure/database/repositories/refresh-token.repository';
+import { DeviceRepository } from '../../infrastructure/database/repositories/device.repository';
 import { JwtTokenService } from '../../infrastructure/auth/jwt-token.service';
 import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service';
 
@@ -75,6 +79,14 @@ import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service
     {
       provide: SESSION_REPOSITORY,
       useClass: SessionRepository,
+    },
+    {
+      provide: REFRESH_TOKEN_REPOSITORY,
+      useClass: RefreshTokenRepository,
+    },
+    {
+      provide: DEVICE_REPOSITORY,
+      useClass: DeviceRepository,
     },
 
     // Service implementations

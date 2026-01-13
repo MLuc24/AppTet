@@ -38,7 +38,7 @@ import {
   UserResponseDto,
 } from './auth.dto';
 import { Public } from '../../common/decorators/public.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, IpAddress, UserAgent } from '../../common/decorators';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -64,8 +64,12 @@ export class AuthController {
     description: 'Email already exists',
     type: ErrorResponseDto,
   })
-  async register(@Body() dto: RegisterDto): Promise<unknown> {
-    const result = await this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @IpAddress() ip?: string,
+    @UserAgent() userAgent?: string,
+  ): Promise<unknown> {
+    const result = await this.authService.register(dto, ip, userAgent);
     return {
       success: true,
       data: result,
@@ -86,8 +90,12 @@ export class AuthController {
     description: 'Invalid credentials or email not verified',
     type: ErrorResponseDto,
   })
-  async login(@Body() dto: LoginDto): Promise<unknown> {
-    const result = await this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @IpAddress() ip?: string,
+    @UserAgent() userAgent?: string,
+  ): Promise<unknown> {
+    const result = await this.authService.login(dto, ip, userAgent);
     return {
       success: true,
       data: result,

@@ -5,9 +5,11 @@
 
 export interface RefreshTokenProps {
   id: string;
+  sessionId: string;
   userId: string;
   tokenHash: string;
   expiresAt: Date;
+  revokedAt?: Date;
   createdAt: Date;
 }
 
@@ -22,6 +24,10 @@ export class RefreshTokenEntity {
     return this.props.id;
   }
 
+  get sessionId(): string {
+    return this.props.sessionId;
+  }
+
   get userId(): string {
     return this.props.userId;
   }
@@ -34,6 +40,10 @@ export class RefreshTokenEntity {
     return this.props.expiresAt;
   }
 
+  get revokedAt(): Date | undefined {
+    return this.props.revokedAt;
+  }
+
   get createdAt(): Date {
     return this.props.createdAt;
   }
@@ -44,8 +54,12 @@ export class RefreshTokenEntity {
     return this.props.expiresAt < new Date();
   }
 
+  isRevoked(): boolean {
+    return this.props.revokedAt !== undefined;
+  }
+
   isValid(): boolean {
-    return !this.isExpired();
+    return !this.isExpired() && !this.isRevoked();
   }
 
   toProps(): RefreshTokenProps {

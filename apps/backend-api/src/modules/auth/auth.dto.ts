@@ -44,6 +44,36 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Display name is required' })
   @MaxLength(255)
   displayName: string;
+
+  // Device information (optional)
+  @ApiPropertyOptional({ example: 'ios', enum: ['ios', 'android'] })
+  @IsOptional()
+  @IsString()
+  platform?: 'ios' | 'android';
+
+  @ApiPropertyOptional({ example: 'iPhone 14 Pro' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  deviceModel?: string;
+
+  @ApiPropertyOptional({ example: '16.0' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  osVersion?: string;
+
+  @ApiPropertyOptional({ example: '1.0.0' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  appVersion?: string;
+
+  @ApiPropertyOptional({ example: 'en-US' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  locale?: string;
 }
 
 export class LoginDto {
@@ -61,6 +91,36 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty({ message: 'Password is required' })
   password: string;
+
+  // Device information (optional)
+  @ApiPropertyOptional({ example: 'ios', enum: ['ios', 'android'] })
+  @IsOptional()
+  @IsString()
+  platform?: 'ios' | 'android';
+
+  @ApiPropertyOptional({ example: 'iPhone 14 Pro' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  deviceModel?: string;
+
+  @ApiPropertyOptional({ example: '16.0' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  osVersion?: string;
+
+  @ApiPropertyOptional({ example: '1.0.0' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  appVersion?: string;
+
+  @ApiPropertyOptional({ example: 'en-US' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  locale?: string;
 }
 
 export class RefreshTokenDto {
@@ -202,6 +262,7 @@ export class RefreshTokenResponseDto {
   @ApiProperty()
   data: {
     accessToken: string;
+    refreshToken: string;
     expiresIn: number;
   };
 }

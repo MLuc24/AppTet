@@ -32,13 +32,14 @@ async function bootstrap() {
   // Global response transformer
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  await app.listen(AppConfig.port);
+  // Listen on all network interfaces (0.0.0.0) to allow mobile device connections
+  await app.listen(AppConfig.port, '0.0.0.0');
 
   console.log(
     `🚀 Backend API is running on: http://localhost:${AppConfig.port}/${AppConfig.apiPrefix}`,
   );
   console.log(
-    `📱 Mobile app can connect to: http://localhost:${AppConfig.port}`,
+    `📱 Mobile app can connect to: http://192.168.1.5:${AppConfig.port}/${AppConfig.apiPrefix}`,
   );
 }
 void bootstrap();
