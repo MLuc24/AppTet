@@ -3,7 +3,13 @@
  * Orchestrates authentication business logic
  */
 
-import { Injectable, Logger, UnauthorizedException, ConflictException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  ConflictException,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IUserRepository } from '../../domain/ports/user-repository.port';
 import { IRoleRepository } from '../../domain/ports/role-repository.port';
@@ -62,8 +68,8 @@ export class AuthService {
    */
   async register(
     dto: RegisterDto,
-    ip?: string,
-    userAgent?: string,
+    _ip?: string,
+    _userAgent?: string,
   ): Promise<{ user: UserResponseDto; message: string }> {
     this.logger.log(`Registering user: ${dto.email || dto.phone}`);
 
@@ -106,14 +112,22 @@ export class AuthService {
     // Assign default role (STUDENT)
     const studentRole = await this.roleRepository.findByCode('STUDENT');
     if (studentRole) {
-      await this.roleRepository.assignRoleToUser(user.userId, studentRole.roleId);
+      await this.roleRepository.assignRoleToUser(
+        user.userId,
+        studentRole.roleId,
+      );
     }
 
     // Create device if device info provided
     if (dto.platform) {
-      const deviceFingerprint = dto.deviceModel || dto.osVersion
-        ? DeviceEntity.generateFingerprint(dto.platform, dto.deviceModel, dto.osVersion)
-        : undefined;
+      const deviceFingerprint =
+        dto.deviceModel || dto.osVersion
+          ? DeviceEntity.generateFingerprint(
+              dto.platform,
+              dto.deviceModel,
+              dto.osVersion,
+            )
+          : undefined;
 
       await this.deviceRepository.create({
         userId: user.userId,
@@ -125,7 +139,9 @@ export class AuthService {
         locale: dto.locale,
       });
 
-      this.logger.log(`Device registered for user ${user.userId}: ${dto.platform}`);
+      this.logger.log(
+        `Device registered for user ${user.userId}: ${dto.platform}`,
+      );
     }
 
     if (user.email && emailVerificationToken) {
@@ -200,13 +216,21 @@ export class AuthService {
     // Handle device registration/update
     let deviceId: string | undefined;
     if (dto.platform) {
-      const deviceFingerprint = dto.deviceModel || dto.osVersion
-        ? DeviceEntity.generateFingerprint(dto.platform, dto.deviceModel, dto.osVersion)
-        : undefined;
+      const deviceFingerprint =
+        dto.deviceModel || dto.osVersion
+          ? DeviceEntity.generateFingerprint(
+              dto.platform,
+              dto.deviceModel,
+              dto.osVersion,
+            )
+          : undefined;
 
       // Try to find existing device by fingerprint
       let device = deviceFingerprint
-        ? await this.deviceRepository.findByFingerprint(user.userId, deviceFingerprint)
+        ? await this.deviceRepository.findByFingerprint(
+            user.userId,
+            deviceFingerprint,
+          )
         : null;
 
       if (device) {
@@ -229,7 +253,9 @@ export class AuthService {
           deviceFingerprint,
           locale: dto.locale,
         });
-        this.logger.log(`New device registered for user ${user.userId}: ${device.id}`);
+        this.logger.log(
+          `New device registered for user ${user.userId}: ${device.id}`,
+        );
       }
 
       deviceId = device.id;
@@ -271,7 +297,9 @@ export class AuthService {
       expiresAt: refreshExpiresAt,
     });
 
-    this.logger.log(`Login successful for user ${user.userId}, session ${session.sessionId}`);
+    this.logger.log(
+      `Login successful for user ${user.userId}, session ${session.sessionId}`,
+    );
 
     return {
       accessToken,
@@ -295,7 +323,8 @@ export class AuthService {
 
       // Verify the refresh token exists in database and is valid
       const refreshTokenHash = await this.hashService.hash(refreshToken);
-      const storedToken = await this.refreshTokenRepository.findByTokenHash(refreshTokenHash);
+      const storedToken =
+        await this.refreshTokenRepository.findByTokenHash(refreshTokenHash);
 
       if (!storedToken || !storedToken.isValid()) {
         throw new UnauthorizedException('Invalid or expired refresh token');
@@ -353,7 +382,8 @@ export class AuthService {
     try {
       // Hash the refresh token to find it in database
       const tokenHash = await this.hashService.hash(refreshToken);
-      const storedToken = await this.refreshTokenRepository.findByTokenHash(tokenHash);
+      const storedToken =
+        await this.refreshTokenRepository.findByTokenHash(tokenHash);
 
       if (storedToken) {
         // Revoke the refresh token
@@ -362,7 +392,9 @@ export class AuthService {
         // Revoke the associated session
         await this.sessionRepository.revoke(storedToken.sessionId);
 
-        this.logger.log(`Logout successful, session ${storedToken.sessionId} revoked`);
+        this.logger.log(
+          `Logout successful, session ${storedToken.sessionId} revoked`,
+        );
       }
 
       return { message: 'Logged out successfully' };
@@ -445,7 +477,8 @@ export class AuthService {
     }
 
     if (token) {
-      const user = await this.userRepository.findByEmailVerificationToken(token);
+      const user =
+        await this.userRepository.findByEmailVerificationToken(token);
       if (user) {
         if (user.emailVerified) {
           return { status: 'already_verified' };
@@ -486,35 +519,41 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.userRepository.findByEmail(dto.email);
-    if (!user || !user.email) {
-      return { message: 'Password reset email sent if email exists' };
-    }
+    
+    // Always return success message for security (prevent email enumeration)
+    // But only send email if user exists
+    if (user && user.email) {
+      const otpCode = this.generateOtpCode();
+      const expiresInMinutes = this.getOtpExpiryMinutes();
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
 
-    const otpCode = this.generateOtpCode();
-    const expiresInMinutes = this.getOtpExpiryMinutes();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
-
-    await this.userRepository.update(user.userId, {
-      passwordResetOtp: otpCode,
-      passwordResetOtpExpiresAt: expiresAt,
-    });
-
-    try {
-      await this.emailService.sendPasswordResetOtpEmail({
-        email: user.email,
-        name: user.displayName,
-        otpCode,
-        expiresInMinutes,
+      await this.userRepository.update(user.userId, {
+        passwordResetOtp: otpCode,
+        passwordResetOtpExpiresAt: expiresAt,
       });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send password reset OTP to ${user.email}`,
-        error instanceof Error ? error.stack : undefined,
-      );
+
+      try {
+        await this.emailService.sendPasswordResetOtpEmail({
+          email: user.email,
+          name: user.displayName,
+          otpCode,
+          expiresInMinutes,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to send password reset OTP to ${user.email}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
 
     return { message: 'Password reset email sent if email exists' };
+  }
+
+  async checkEmailExists(email: string): Promise<{ exists: boolean }> {
+    const user = await this.userRepository.findByEmail(email);
+    return { exists: !!user };
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
