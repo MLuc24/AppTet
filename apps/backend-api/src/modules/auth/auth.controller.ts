@@ -70,11 +70,7 @@ export class AuthController {
     @IpAddress() ip?: string,
     @UserAgent() userAgent?: string,
   ): Promise<unknown> {
-    const result = await this.authService.register(dto, ip, userAgent);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.register(dto, ip, userAgent);
   }
 
   @Public()
@@ -96,11 +92,7 @@ export class AuthController {
     @IpAddress() ip?: string,
     @UserAgent() userAgent?: string,
   ): Promise<unknown> {
-    const result = await this.authService.login(dto, ip, userAgent);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.login(dto, ip, userAgent);
   }
 
   @Public()
@@ -137,11 +129,7 @@ export class AuthController {
     type: MessageResponseDto,
   })
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<unknown> {
-    const result = await this.authService.forgotPassword(dto);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.forgotPassword(dto);
   }
 
   @Public()
@@ -153,11 +141,7 @@ export class AuthController {
     description: 'Email existence check',
   })
   async checkEmail(@Body() dto: CheckEmailDto): Promise<unknown> {
-    const result = await this.authService.checkEmailExists(dto.email);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.checkEmailExists(dto.email);
   }
 
   @Public()
@@ -175,11 +159,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<unknown> {
-    const result = await this.authService.resetPassword(dto);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.resetPassword(dto);
   }
 
   @Post('change-password')
@@ -200,11 +180,7 @@ export class AuthController {
     @CurrentUser('userId') userId: string,
     @Body() dto: ChangePasswordDto,
   ): Promise<unknown> {
-    const result = await this.authService.changePassword(userId, dto);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.changePassword(userId, dto);
   }
 
   @Public()
@@ -222,11 +198,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   async refresh(@Body() dto: RefreshTokenDto): Promise<unknown> {
-    const result = await this.authService.refreshAccessToken(dto.refreshToken);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.refreshAccessToken(dto.refreshToken);
   }
 
   @Post('logout')
@@ -239,11 +211,7 @@ export class AuthController {
     type: MessageResponseDto,
   })
   async logout(@Body() dto: LogoutDto): Promise<unknown> {
-    const result = await this.authService.logout(dto.refreshToken);
-    return {
-      success: true,
-      data: result,
-    };
+    return await this.authService.logout(dto.refreshToken);
   }
 
   @Get('profile')
@@ -260,11 +228,7 @@ export class AuthController {
     type: ErrorResponseDto,
   })
   async getProfile(@CurrentUser('userId') userId: string): Promise<unknown> {
-    const user = await this.authService.getProfile(userId);
-    return {
-      success: true,
-      data: user,
-    };
+    return await this.authService.getProfile(userId);
   }
 }
 
