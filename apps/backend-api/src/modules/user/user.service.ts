@@ -19,12 +19,15 @@ import {
   AdminUserListResponseDto,
   AdminUserRolesResponseDto,
 } from './user.dto';
+import { MediaService } from '../media/media.service';
+import { MediaCategory, MediaUploadResponseDto } from '../media/media.dto';
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly roleRepository: RoleRepository,
+    private readonly mediaService: MediaService,
   ) {}
 
   async getProfile(userId: string): Promise<UserProfileDto> {
@@ -72,6 +75,30 @@ export class UserService {
     }
 
     return this.mapPublicProfile(user);
+  }
+
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<MediaUploadResponseDto> {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Upload avatar using MediaService
+    const uploadResult = await this.mediaService.uploadFile(
+      file,
+      MediaCategory.AVATAR,
+      userId,
+      'avatar.jpg', // Will be sanitized in MediaService
+    );
+
+    // Update user's avatarAssetId in database
+    await this.userRepository.update(userId, {
+      avatarAssetId: uploadResult.assetId,
+    });
+
+    return uploadResult;
   }
 
   async listUsers(

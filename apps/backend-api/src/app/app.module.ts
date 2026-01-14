@@ -12,6 +12,7 @@ import { LearningModule } from '../modules/learning/learning.module';
 import { AiModule } from '../modules/ai/ai.module';
 import { NotificationModule } from '../modules/notification/notification.module';
 import { EmailModule } from '../modules/email/email.module';
+import { MediaModule } from '../modules/media/media.module';
 
 // Global guards, filters, interceptors
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -23,10 +24,11 @@ import { TransformInterceptor } from '../common/interceptors/transform.intercept
     // Config module (load .env)
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['apps/backend-api/.env', '.env', '.env.local'],
+      envFilePath: ['.env', '../.env', '.env.local'],
     }),
 
     EmailModule,
+    MediaModule,
     AuthModule,
     UserModule,
     CourseModule,
