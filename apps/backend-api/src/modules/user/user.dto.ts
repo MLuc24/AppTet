@@ -81,6 +81,9 @@ export class PublicUserProfileDto {
   @ApiPropertyOptional()
   avatarAssetId?: string;
 
+  @ApiPropertyOptional()
+  avatarUrl?: string;
+
   @ApiProperty({ enum: UserStatus })
   status: UserStatus;
 
@@ -196,6 +199,9 @@ export class UserProfileDto {
   @ApiPropertyOptional()
   avatarAssetId?: string;
 
+  @ApiPropertyOptional()
+  avatarUrl?: string;
+
   @ApiProperty({ enum: UserStatus })
   status: UserStatus;
 
@@ -236,6 +242,9 @@ export class AdminUserDto {
 
   @ApiPropertyOptional()
   avatarAssetId?: string;
+
+  @ApiPropertyOptional()
+  avatarUrl?: string;
 
   @ApiProperty({ enum: UserStatus })
   status: UserStatus;

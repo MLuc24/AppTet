@@ -10,6 +10,7 @@ export interface CreateMediaAssetData {
   assetId: string;
   storageProvider: string;
   fileUrl: string;
+  publicUrl?: string;
   mimeType: string;
   fileSizeBytes: bigint;
   checksum: string;
@@ -20,6 +21,7 @@ export interface MediaAssetEntity {
   assetId: string;
   storageProvider: string;
   fileUrl: string;
+  publicUrl?: string;
   mimeType: string;
   fileSizeBytes: bigint;
   checksum: string;
@@ -38,6 +40,7 @@ export class MediaAssetRepository {
         asset_id: data.assetId,
         storage_provider: data.storageProvider,
         file_url: data.fileUrl,
+        public_url: data.publicUrl,
         mime_type: data.mimeType,
         file_size_bytes: data.fileSizeBytes,
         checksum: data.checksum,
@@ -67,6 +70,7 @@ export class MediaAssetRepository {
       assetId: prismaAsset.asset_id,
       storageProvider: prismaAsset.storage_provider,
       fileUrl: prismaAsset.file_url,
+      publicUrl: prismaAsset.public_url || undefined,
       mimeType: prismaAsset.mime_type,
       fileSizeBytes: prismaAsset.file_size_bytes || BigInt(0),
       checksum: prismaAsset.checksum || '',

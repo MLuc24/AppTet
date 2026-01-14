@@ -45,6 +45,13 @@ export class MediaService {
   ) {}
 
   /**
+   * Get media asset by ID
+   */
+  async getAssetById(assetId: string) {
+    return this.mediaAssetRepository.findById(assetId);
+  }
+
+  /**
    * Upload media file
    */
   async uploadFile(
@@ -73,6 +80,7 @@ export class MediaService {
       assetId: result.assetId,
       storageProvider: 'r2',
       fileUrl: result.fileUrl,
+      publicUrl: result.publicUrl,
       mimeType: result.mimeType,
       fileSizeBytes: BigInt(result.fileSize),
       checksum: result.checksum,

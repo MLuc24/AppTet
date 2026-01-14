@@ -39,6 +39,21 @@ export class UserService {
     return this.mapUserProfile(user);
   }
 
+  private async getAvatarUrl(avatarAssetId?: string): Promise<string | undefined> {
+    if (!avatarAssetId) {
+      return undefined;
+    }
+
+    try {
+      const asset = await this.mediaService.getAssetById(avatarAssetId);
+      // Return publicUrl for direct browser access, fallback to fileUrl
+      return asset?.publicUrl || asset?.fileUrl;
+    } catch (error) {
+      // If asset not found, return undefined
+      return undefined;
+    }
+  }
+
   async getSettings(userId: string): Promise<UserSettingsDto> {
     const user = await this.userRepository.findById(userId);
     if (!user) {
@@ -74,7 +89,7 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    return this.mapPublicProfile(user);
+    return await this.mapPublicProfile(user);
   }
 
   async uploadAvatar(
@@ -127,7 +142,7 @@ export class UserService {
     const items = await Promise.all(
       users.map(async (user) => {
         const roles = await this.roleRepository.getUserRoles(user.userId);
-        return this.mapAdminUser(
+        return await this.mapAdminUser(
           user,
           roles.map((role) => role.code),
         );
@@ -149,7 +164,7 @@ export class UserService {
     }
 
     const roles = await this.roleRepository.getUserRoles(userId);
-    return this.mapAdminUser(
+    return await this.mapAdminUser(
       user,
       roles.map((role) => role.code),
     );
@@ -191,7 +206,7 @@ export class UserService {
     });
 
     const roles = await this.roleRepository.getUserRoles(userId);
-    return this.mapAdminUser(
+    return await this.mapAdminUser(
       updated,
       roles.map((role) => role.code),
     );
@@ -257,13 +272,16 @@ export class UserService {
     };
   }
 
-  private mapUserProfile(user: UserEntity): UserProfileDto {
+  private async mapUserProfile(user: UserEntity): Promise<UserProfileDto> {
+    const avatarUrl = await this.getAvatarUrl(user.avatarAssetId);
+    
     return {
       userId: user.userId,
       email: user.email,
       phone: user.phone,
       displayName: user.displayName,
       avatarAssetId: user.avatarAssetId,
+      avatarUrl,
       status: user.status as UserStatus,
       emailVerified: user.emailVerified,
       dob: user.dob,
@@ -275,13 +293,16 @@ export class UserService {
     };
   }
 
-  private mapAdminUser(user: UserEntity, roles: string[]): AdminUserDto {
+  private async mapAdminUser(user: UserEntity, roles: string[]): Promise<AdminUserDto> {
+    const avatarUrl = await this.getAvatarUrl(user.avatarAssetId);
+    
     return {
       userId: user.userId,
       email: user.email,
       phone: user.phone,
       displayName: user.displayName,
       avatarAssetId: user.avatarAssetId,
+      avatarUrl,
       status: user.status as UserStatus,
       emailVerified: user.emailVerified,
       dob: user.dob,
@@ -306,11 +327,14 @@ export class UserService {
     };
   }
 
-  private mapPublicProfile(user: UserEntity): PublicUserProfileDto {
+  private async mapPublicProfile(user: UserEntity): Promise<PublicUserProfileDto> {
+    const avatarUrl = await this.getAvatarUrl(user.avatarAssetId);
+    
     return {
       userId: user.userId,
       displayName: user.displayName,
       avatarAssetId: user.avatarAssetId,
+      avatarUrl,
       status: user.status as UserStatus,
       createdAt: user.createdAt,
     };
