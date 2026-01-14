@@ -10,15 +10,16 @@ import {
   ConflictException,
   Inject,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { IUserRepository } from '../../domain/ports/user-repository.port';
 import { IRoleRepository } from '../../domain/ports/role-repository.port';
 import { ISessionRepository } from '../../domain/ports/session-repository.port';
-import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
-import { IDeviceRepository } from '../../domain/ports/device-repository.port';
 import { ITokenService } from '../../domain/ports/token-service.port';
 import { IHashService } from '../../domain/ports/hash-service.port';
 import { IEmailService } from '../../domain/ports/email-service.port';
+import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
+import { IDeviceRepository } from '../../domain/ports/device-repository.port';
 import { DeviceEntity } from '../../domain/entities/device.entity';
 import {
   RegisterDto,
@@ -68,10 +69,13 @@ export class AuthService {
    */
   async register(
     dto: RegisterDto,
-    _ip?: string,
-    _userAgent?: string,
+    ip?: string,
+    userAgent?: string,
   ): Promise<{ user: UserResponseDto; message: string }> {
-    this.logger.log(`Registering user: ${dto.email || dto.phone}`);
+    const originInfo = [ip, userAgent].filter(Boolean).join(' | ');
+    this.logger.log(
+      `Registering user: ${dto.email || dto.phone}${originInfo ? ` (${originInfo})` : ''}`,
+    );
 
     // Validate: at least email or phone required
     if (!dto.email && !dto.phone) {
@@ -272,7 +276,7 @@ export class AuthService {
       sub: user.userId,
     });
 
-    // Create session with device and metadata
+    // Create session
     const accessTokenHash = await this.hashService.hash(accessToken);
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes
@@ -287,7 +291,7 @@ export class AuthService {
     });
 
     // Save refresh token to database
-    const refreshTokenHash = await this.hashService.hash(refreshToken);
+    const refreshTokenHash = this.hashToken(refreshToken);
     const refreshExpiresAt = new Date();
     refreshExpiresAt.setDate(refreshExpiresAt.getDate() + 7); // 7 days
 
@@ -318,11 +322,10 @@ export class AuthService {
     expiresIn: number;
   }> {
     try {
-      // Verify the refresh token JWT
       const payload = await this.tokenService.verifyRefreshToken(refreshToken);
 
       // Verify the refresh token exists in database and is valid
-      const refreshTokenHash = await this.hashService.hash(refreshToken);
+      const refreshTokenHash = this.hashToken(refreshToken);
       const storedToken =
         await this.refreshTokenRepository.findByTokenHash(refreshTokenHash);
 
@@ -336,52 +339,29 @@ export class AuthService {
         throw new UnauthorizedException('Invalid token');
       }
 
-      // Generate new access token
       const accessToken = await this.tokenService.generateAccessToken({
         sub: user.userId,
         email: user.email,
         phone: user.phone,
       });
 
-      // Implement refresh token rotation for security
-      // Revoke old refresh token
-      await this.refreshTokenRepository.revoke(storedToken.id);
-
-      // Generate new refresh token
-      const newRefreshToken = await this.tokenService.generateRefreshToken({
-        sub: user.userId,
-      });
-
-      const newRefreshTokenHash = await this.hashService.hash(newRefreshToken);
-      const refreshExpiresAt = new Date();
-      refreshExpiresAt.setDate(refreshExpiresAt.getDate() + 7); // 7 days
-
-      await this.refreshTokenRepository.create({
-        sessionId: storedToken.sessionId,
-        tokenHash: newRefreshTokenHash,
-        expiresAt: refreshExpiresAt,
-      });
-
-      this.logger.log(`Token refreshed for user ${user.userId}`);
-
       return {
         accessToken,
-        refreshToken: newRefreshToken,
+        refreshToken,
         expiresIn: 900,
       };
-    } catch (error) {
-      this.logger.error('Refresh token error:', error);
+    } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
 
   /**
-   * Logout - revoke session and refresh token
+   * Logout - revoke session
    */
   async logout(refreshToken: string): Promise<{ message: string }> {
     try {
       // Hash the refresh token to find it in database
-      const tokenHash = await this.hashService.hash(refreshToken);
+      const tokenHash = this.hashToken(refreshToken);
       const storedToken =
         await this.refreshTokenRepository.findByTokenHash(tokenHash);
 
@@ -467,6 +447,10 @@ export class AuthService {
     };
   }
 
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
   // Placeholder methods for compatibility
   async verifyEmail(
     token: string,
@@ -519,19 +503,32 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.userRepository.findByEmail(dto.email);
-    
-    // Always return success message for security (prevent email enumeration)
-    // But only send email if user exists
-    if (user && user.email) {
-      const otpCode = this.generateOtpCode();
-      const expiresInMinutes = this.getOtpExpiryMinutes();
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+    if (!user || !user.email) {
+      return { message: 'Password reset email sent if email exists' };
+    }
 
-      await this.userRepository.update(user.userId, {
-        passwordResetOtp: otpCode,
-        passwordResetOtpExpiresAt: expiresAt,
+    const otpCode = this.generateOtpCode();
+    const expiresInMinutes = this.getOtpExpiryMinutes();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+
+    await this.userRepository.update(user.userId, {
+      passwordResetOtp: otpCode,
+      passwordResetOtpExpiresAt: expiresAt,
+    });
+
+    try {
+      await this.emailService.sendPasswordResetOtpEmail({
+        email: user.email,
+        name: user.displayName,
+        otpCode,
+        expiresInMinutes,
       });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset OTP to ${user.email}`,
+        error instanceof Error ? error.stack : undefined,
+      );
 
       try {
         await this.emailService.sendPasswordResetOtpEmail({
