@@ -8,7 +8,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { IUserRepository } from '../../../domain/ports/user-repository.port';
-import { USER_REPOSITORY } from '../auth.constants';
+import { IRoleRepository } from '../../../domain/ports/role-repository.port';
+import { USER_REPOSITORY, ROLE_REPOSITORY } from '../auth.constants';
 
 export interface JwtPayload {
   sub: string;
@@ -22,6 +23,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly configService: ConfigService,
     @Inject(USER_REPOSITORY)
     private readonly userRepository: IUserRepository,
+    @Inject(ROLE_REPOSITORY)
+    private readonly roleRepository: IRoleRepository,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
     if (!secret) {
@@ -38,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     userId: string;
     email?: string;
     phone?: string;
+    roles: string[];
   }> {
     // Validate user still exists
     const user = await this.userRepository.findById(payload.sub);
@@ -45,11 +49,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User not found');
     }
 
+    const roles = await this.roleRepository.getUserRoles(user.userId);
+
     // Attach user info to request
     return {
       userId: payload.sub,
       email: payload.email,
       phone: payload.phone,
+      roles: roles.map((role) => role.code),
     };
   }
 }

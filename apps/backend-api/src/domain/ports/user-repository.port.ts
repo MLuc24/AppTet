@@ -42,6 +42,18 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<UserEntity | null>;
   findByPhone(phone: string): Promise<UserEntity | null>;
   findByEmailVerificationToken(token: string): Promise<UserEntity | null>;
+  findMany(params: {
+    skip?: number;
+    take?: number;
+    search?: string;
+    status?: UserStatus;
+    roleCode?: string;
+  }): Promise<UserEntity[]>;
+  countByFilter(params: {
+    search?: string;
+    status?: UserStatus;
+    roleCode?: string;
+  }): Promise<number>;
 
   // Command methods
   create(data: CreateUserData): Promise<UserEntity>;

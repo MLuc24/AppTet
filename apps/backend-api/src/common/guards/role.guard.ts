@@ -28,7 +28,10 @@ export class RoleGuard implements CanActivate {
     }
 
     interface RequestWithUser {
-      user?: { role: string };
+      user?: {
+        role?: string;
+        roles?: Array<string | { code?: string }>;
+      };
     }
 
     const request = context.switchToHttp().getRequest<RequestWithUser>();
@@ -38,7 +41,22 @@ export class RoleGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    const rawRoles = user.roles
+      ? user.roles
+      : user.role
+        ? [user.role]
+        : [];
+    const normalizedRoles = rawRoles
+      .map((role) =>
+        typeof role === 'string'
+          ? role
+          : role && typeof role.code === 'string'
+            ? role.code
+            : null,
+      )
+      .filter((role): role is string => !!role);
+
+    const hasRole = requiredRoles.some((role) => normalizedRoles.includes(role));
 
     if (!hasRole) {
       throw new ForbiddenException('Insufficient permissions');

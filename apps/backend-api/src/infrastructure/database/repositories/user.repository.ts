@@ -38,6 +38,34 @@ export class UserRepository implements IUserRepository {
     return user ? this.toDomain(user) : null;
   }
 
+  async findMany(params: {
+    skip?: number;
+    take?: number;
+    search?: string;
+    status?: UserStatus;
+    roleCode?: string;
+  }): Promise<UserEntity[]> {
+    const where = this.buildUserFilter(params);
+
+    const users = await this.prisma.users.findMany({
+      where,
+      skip: params.skip,
+      take: params.take,
+      orderBy: { created_at: 'desc' },
+    });
+
+    return users.map((user) => this.toDomain(user));
+  }
+
+  async countByFilter(params: {
+    search?: string;
+    status?: UserStatus;
+    roleCode?: string;
+  }): Promise<number> {
+    const where = this.buildUserFilter(params);
+    return this.prisma.users.count({ where });
+  }
+
   async create(data: CreateUserData): Promise<UserEntity> {
     const user = await this.prisma.users.create({
       data: {
@@ -127,5 +155,37 @@ export class UserRepository implements IUserRepository {
       createdAt: prismaUser.created_at || new Date(),
       updatedAt: prismaUser.updated_at || new Date(),
     });
+  }
+
+  private buildUserFilter(params: {
+    search?: string;
+    status?: UserStatus;
+    roleCode?: string;
+  }) {
+    const where: Record<string, unknown> = {};
+
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    if (params.search) {
+      where.OR = [
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { phone: { contains: params.search, mode: 'insensitive' } },
+        { display_name: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (params.roleCode) {
+      where.user_roles = {
+        some: {
+          roles: {
+            code: params.roleCode,
+          },
+        },
+      };
+    }
+
+    return where;
   }
 }
