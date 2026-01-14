@@ -54,3 +54,6 @@ coverage/
 # Temp files
 *.tmp
 .cache/
+
+# Firebase Admin credentials
+firebase-service-account.json
