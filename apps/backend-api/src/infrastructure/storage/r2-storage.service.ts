@@ -25,7 +25,8 @@ import {
 @Injectable()
 export class R2StorageService implements IStorageService {
   private readonly logger = new Logger(R2StorageService.name);
-  private readonly s3Client: S3Client;
+  private readonly s3Client?: S3Client;
+  private readonly isConfigured: boolean;
   private readonly bucket: string;
   private readonly publicUrl: string;
 
@@ -44,11 +45,14 @@ export class R2StorageService implements IStorageService {
     this.logger.log(`process.env.R2_ENDPOINT: ${process.env.R2_ENDPOINT}`);
 
     if (!endpoint || !accessKeyId || !secretAccessKey) {
-      throw new Error(
-        'R2 configuration is missing. Check R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY',
+      this.isConfigured = false;
+      this.logger.warn(
+        'R2 configuration is missing. Upload endpoints will be disabled until R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY are set.',
       );
+      return;
     }
 
+    this.isConfigured = true;
     this.s3Client = new S3Client({
       region: 'auto',
       endpoint,
@@ -65,6 +69,7 @@ export class R2StorageService implements IStorageService {
    * Upload file to R2
    */
   async upload(options: UploadFileOptions): Promise<UploadResult> {
+    this.assertConfigured();
     const { folder, filename, buffer, mimetype, userId } = options;
 
     // Generate unique key with timestamp
@@ -80,7 +85,7 @@ export class R2StorageService implements IStorageService {
 
     try {
       // Upload to R2
-      await this.s3Client.send(
+      await this.s3Client!.send(
         new PutObjectCommand({
           Bucket: this.bucket,
           Key: key,
@@ -120,13 +125,14 @@ export class R2StorageService implements IStorageService {
    * Delete file from R2
    */
   async delete(options: DeleteFileOptions): Promise<void> {
+    this.assertConfigured();
     const { fileUrl } = options;
 
     // Extract key from fileUrl (format: bucket/path/to/file)
     const key = this.extractKeyFromUrl(fileUrl);
 
     try {
-      await this.s3Client.send(
+      await this.s3Client!.send(
         new DeleteObjectCommand({
           Bucket: this.bucket,
           Key: key,
@@ -145,6 +151,7 @@ export class R2StorageService implements IStorageService {
    * Use for temporary access to files
    */
   async getSignedUrl(options: GetSignedUrlOptions): Promise<string> {
+    this.assertConfigured();
     const { fileUrl, expiresIn = 3600 } = options;
 
     const key = this.extractKeyFromUrl(fileUrl);
@@ -155,7 +162,7 @@ export class R2StorageService implements IStorageService {
         Key: key,
       });
 
-      const signedUrl = await getSignedUrl(this.s3Client, command, {
+      const signedUrl = await getSignedUrl(this.s3Client!, command, {
         expiresIn,
       });
 
@@ -170,10 +177,11 @@ export class R2StorageService implements IStorageService {
    * Check if file exists in R2
    */
   async exists(fileUrl: string): Promise<boolean> {
+    this.assertConfigured();
     const key = this.extractKeyFromUrl(fileUrl);
 
     try {
-      await this.s3Client.send(
+      await this.s3Client!.send(
         new HeadObjectCommand({
           Bucket: this.bucket,
           Key: key,
@@ -219,5 +227,13 @@ export class R2StorageService implements IStorageService {
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .replace(/_{2,}/g, '_')
       .toLowerCase();
+  }
+
+  private assertConfigured(): void {
+    if (!this.isConfigured || !this.s3Client) {
+      throw new Error(
+        'R2 is not configured. Set R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY to enable uploads.',
+      );
+    }
   }
 }
