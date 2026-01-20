@@ -5,6 +5,7 @@
 
 import { Controller, Get, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
 import { CourseService } from './course.service';
 import {
   CourseQueryDto,
@@ -14,6 +15,7 @@ import {
 
 @ApiTags('Courses')
 @Controller('courses')
+@Public()
 export class CourseController {
   constructor(private readonly courseService: CourseService) {}
 

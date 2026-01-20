@@ -5,7 +5,7 @@
  */
 
 export enum EnrollmentStatus {
-  ACTIVE = 'active',
+  ONGOING = 'ongoing',
   COMPLETED = 'completed',
   DROPPED = 'dropped',
 }
@@ -68,7 +68,7 @@ export class EnrollmentEntity {
 
   // Business Methods
   isActive(): boolean {
-    return this.props.status === EnrollmentStatus.ACTIVE;
+    return this.props.status === EnrollmentStatus.ONGOING;
   }
 
   isCompleted(): boolean {
@@ -99,7 +99,7 @@ export class EnrollmentEntity {
       userId,
       courseId,
       courseVersionId,
-      status: EnrollmentStatus.ACTIVE,
+      status: EnrollmentStatus.ONGOING,
       enrolledAt: now,
       createdAt: now,
       updatedAt: now,

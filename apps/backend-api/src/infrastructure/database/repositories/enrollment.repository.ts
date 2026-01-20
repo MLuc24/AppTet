@@ -80,7 +80,7 @@ export class EnrollmentRepository implements IEnrollmentRepository {
         user_id: data.userId,
         course_id: data.courseId,
         course_version_id: data.courseVersionId,
-        status: EnrollmentStatus.ACTIVE,
+        status: EnrollmentStatus.ONGOING,
         enrolled_at: new Date(),
       },
     });
@@ -124,7 +124,7 @@ export class EnrollmentRepository implements IEnrollmentRepository {
       where: {
         user_id: userId,
         course_id: courseId,
-        status: EnrollmentStatus.ACTIVE,
+        status: EnrollmentStatus.ONGOING,
       },
     });
     return count > 0;

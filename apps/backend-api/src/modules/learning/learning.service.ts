@@ -145,7 +145,7 @@ export class LearningService {
 
     const enrollments = await this.enrollmentRepository.findByUserId(userId);
     const activeEnrollment = enrollments.find(
-      (e) => e.status === EnrollmentStatus.ACTIVE,
+      (e) => e.status === EnrollmentStatus.ONGOING,
     );
 
     if (!activeEnrollment) {
@@ -226,7 +226,7 @@ export class LearningService {
   ): Promise<LessonProgressResponseDto | null> {
     const enrollments = await this.enrollmentRepository.findByUserId(userId);
     const activeEnrollment = enrollments.find(
-      (e) => e.status === EnrollmentStatus.ACTIVE,
+      (e) => e.status === EnrollmentStatus.ONGOING,
     );
 
     if (!activeEnrollment) {
