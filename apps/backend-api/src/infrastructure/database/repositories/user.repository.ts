@@ -17,7 +17,9 @@ export class UserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findById(userId: string): Promise<UserEntity | null> {
-    const user = await this.prisma.users.findUnique({ where: { user_id: userId } });
+    const user = await this.prisma.users.findUnique({
+      where: { user_id: userId },
+    });
     return user ? this.toDomain(user) : null;
   }
 
@@ -31,7 +33,9 @@ export class UserRepository implements IUserRepository {
     return user ? this.toDomain(user) : null;
   }
 
-  async findByEmailVerificationToken(token: string): Promise<UserEntity | null> {
+  async findByEmailVerificationToken(
+    token: string,
+  ): Promise<UserEntity | null> {
     const user = await this.prisma.users.findUnique({
       where: { email_verification_token: token },
     });
@@ -103,8 +107,7 @@ export class UserRepository implements IUserRepository {
     if (data.passwordResetOtp !== undefined)
       updateData.password_reset_otp = data.passwordResetOtp;
     if (data.passwordResetOtpExpiresAt !== undefined)
-      updateData.password_reset_otp_expires_at =
-        data.passwordResetOtpExpiresAt;
+      updateData.password_reset_otp_expires_at = data.passwordResetOtpExpiresAt;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.dob !== undefined) updateData.dob = data.dob;
     if (data.nativeLanguageId !== undefined)

@@ -12,7 +12,9 @@ export class RoleRepository implements IRoleRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findById(roleId: number): Promise<RoleEntity | null> {
-    const role = await this.prisma.roles.findUnique({ where: { role_id: roleId } });
+    const role = await this.prisma.roles.findUnique({
+      where: { role_id: roleId },
+    });
     return role ? this.toDomain(role) : null;
   }
 

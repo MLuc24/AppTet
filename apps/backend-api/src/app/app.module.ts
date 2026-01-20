@@ -7,6 +7,8 @@ import { AppService } from './app.service';
 import { AuthModule } from '../modules/auth/auth.module';
 import { UserModule } from '../modules/user/user.module';
 import { CourseModule } from '../modules/course/course.module';
+import { UnitModule } from '../modules/unit/unit.module';
+import { SkillModule } from '../modules/skill/skill.module';
 import { LessonModule } from '../modules/lesson/lesson.module';
 import { LearningModule } from '../modules/learning/learning.module';
 import { AiModule } from '../modules/ai/ai.module';
@@ -32,6 +34,8 @@ import { TransformInterceptor } from '../common/interceptors/transform.intercept
     AuthModule,
     UserModule,
     CourseModule,
+    UnitModule,
+    SkillModule,
     LessonModule,
     LearningModule,
     AiModule,

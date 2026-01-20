@@ -17,7 +17,7 @@ export interface ISessionRepository {
   findById(sessionId: string): Promise<SessionEntity | null>;
   findByAccessTokenHash(tokenHash: string): Promise<SessionEntity | null>;
   findActiveByUserId(userId: string): Promise<SessionEntity[]>;
-  
+
   create(data: CreateSessionData): Promise<SessionEntity>;
   revoke(sessionId: string): Promise<void>;
   revokeAllByUserId(userId: string): Promise<void>;

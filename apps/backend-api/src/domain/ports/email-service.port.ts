@@ -48,9 +48,7 @@ export abstract class IEmailService {
   /**
    * Send password reset OTP email
    */
-  abstract sendPasswordResetOtpEmail(
-    data: PasswordResetOtpData,
-  ): Promise<void>;
+  abstract sendPasswordResetOtpEmail(data: PasswordResetOtpData): Promise<void>;
 
   /**
    * Send welcome email after registration
@@ -60,7 +58,5 @@ export abstract class IEmailService {
   /**
    * Send password changed confirmation
    */
-  abstract sendPasswordChangedEmail(
-    data: PasswordChangedData,
-  ): Promise<void>;
+  abstract sendPasswordChangedEmail(data: PasswordChangedData): Promise<void>;
 }
