@@ -63,6 +63,11 @@ export class CreateCourseDto {
   @MaxLength(50)
   courseCode: string;
 
+  @ApiPropertyOptional({ description: 'Cover image asset ID' })
+  @IsOptional()
+  @IsString()
+  coverAssetId?: string;
+
   @ApiPropertyOptional({ type: [LocalizationDto] })
   @IsOptional()
   @IsArray()
@@ -92,6 +97,11 @@ export class UpdateCourseDto {
   @IsString()
   @MaxLength(50)
   courseCode?: string;
+
+  @ApiPropertyOptional({ description: 'Cover image asset ID' })
+  @IsOptional()
+  @IsString()
+  coverAssetId?: string;
 }
 
 export class CourseQueryDto {
@@ -196,6 +206,12 @@ export class CourseResponseDto {
 
   @ApiProperty()
   isPublished: boolean;
+
+  @ApiPropertyOptional()
+  coverAssetId?: string;
+
+  @ApiPropertyOptional()
+  coverUrl?: string;
 
   @ApiProperty({ type: [CourseLocalizationResponseDto] })
   localizations: CourseLocalizationResponseDto[];

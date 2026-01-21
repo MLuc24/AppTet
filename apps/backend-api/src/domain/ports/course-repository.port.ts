@@ -11,6 +11,7 @@ export interface CreateCourseData {
   levelId: number;
   courseCode: string;
   isPublished?: boolean;
+  coverAssetId?: string;
   createdBy?: string;
   localizations?: CourseLocalization[];
 }
@@ -21,6 +22,7 @@ export interface UpdateCourseData {
   levelId?: number;
   courseCode?: string;
   isPublished?: boolean;
+  coverAssetId?: string;
 }
 
 export interface CourseFilter {

@@ -68,6 +68,7 @@ export class CourseRepository implements ICourseRepository {
         level_id: data.levelId,
         course_code: data.courseCode,
         is_published: data.isPublished ?? false,
+        cover_asset_id: data.coverAssetId,
         created_by: data.createdBy,
         course_localizations: data.localizations?.length
           ? {
@@ -99,6 +100,8 @@ export class CourseRepository implements ICourseRepository {
     if (data.courseCode !== undefined) updateData.course_code = data.courseCode;
     if (data.isPublished !== undefined)
       updateData.is_published = data.isPublished;
+    if (data.coverAssetId !== undefined)
+      updateData.cover_asset_id = data.coverAssetId;
 
     const course = await this.prisma.courses.update({
       where: { course_id: courseId },
@@ -205,6 +208,7 @@ export class CourseRepository implements ICourseRepository {
       levelId: prisma.level_id,
       courseCode: prisma.course_code,
       isPublished: prisma.is_published ?? false,
+      coverAssetId: prisma.cover_asset_id ?? undefined,
       createdBy: prisma.created_by ?? undefined,
       createdAt: prisma.created_at ?? new Date(),
       updatedAt: prisma.updated_at ?? new Date(),
