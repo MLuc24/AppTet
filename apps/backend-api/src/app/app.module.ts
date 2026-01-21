@@ -10,6 +10,7 @@ import { CourseModule } from '../modules/course/course.module';
 import { UnitModule } from '../modules/unit/unit.module';
 import { SkillModule } from '../modules/skill/skill.module';
 import { LessonModule } from '../modules/lesson/lesson.module';
+import { ExerciseModule } from '../modules/exercise/exercise.module';
 import { LearningModule } from '../modules/learning/learning.module';
 import { AiModule } from '../modules/ai/ai.module';
 import { NotificationModule } from '../modules/notification/notification.module';
@@ -37,6 +38,7 @@ import { TransformInterceptor } from '../common/interceptors/transform.intercept
     UnitModule,
     SkillModule,
     LessonModule,
+    ExerciseModule,
     LearningModule,
     AiModule,
     NotificationModule,

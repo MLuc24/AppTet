@@ -319,9 +319,70 @@ export class CourseService {
       }
     }
 
+    // Get published version's units
+    const publishedVersion = structure?.course_versions?.[0];
+    const units = publishedVersion?.units || [];
+
+    // Transform to match frontend expectations
+    const transformedUnits = units.map((unit) => ({
+      unitId: unit.unit_id,
+      courseVersionId: unit.course_version_id,
+      orderIndex: unit.order_index,
+      title: unit.unit_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+      description: unit.unit_localizations?.find(l => !languageId || l.language_id === languageId)?.description,
+      localizations: unit.unit_localizations?.map(l => ({
+        languageId: l.language_id,
+        title: l.title,
+        description: l.description,
+      })),
+      skills: unit.skills?.map((skill) => ({
+        skillId: skill.skill_id,
+        unitId: skill.unit_id,
+        skillType: skill.skill_type,
+        orderIndex: skill.order_index,
+        title: skill.skill_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+        description: skill.skill_localizations?.find(l => !languageId || l.language_id === languageId)?.description,
+        localizations: skill.skill_localizations?.map(l => ({
+          languageId: l.language_id,
+          title: l.title,
+          description: l.description,
+        })),
+        lessons: skill.lessons?.map((lesson) => ({
+          lessonId: lesson.lesson_id,
+          skillId: lesson.skill_id,
+          lessonType: lesson.lesson_type,
+          orderIndex: lesson.order_index,
+          title: lesson.lesson_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+          localizations: lesson.lesson_localizations?.map(l => ({
+            languageId: l.language_id,
+            title: l.title,
+          })),
+        })),
+      })),
+    }));
+
+    // Get localization for course
+    const localization = languageId
+      ? course.localizations.find((l) => l.languageId === languageId)
+      : course.localizations[0];
+
     return {
-      ...structure,
+      courseId: course.courseId,
+      courseCode: course.courseCode,
+      targetLanguageId: course.targetLanguageId,
+      baseLanguageId: course.baseLanguageId,
+      levelId: course.levelId,
+      isPublished: course.isPublished,
+      coverAssetId: course.coverAssetId,
       coverUrl,
+      localizations: course.localizations.map((l) => ({
+        languageId: l.languageId,
+        title: l.title,
+        description: l.description,
+      })),
+      title: localization?.title,
+      description: localization?.description,
+      units: transformedUnits,
     };
   }
 
