@@ -3,7 +3,7 @@
  * Request and Response DTOs for enrollment and progress tracking
  */
 
-import { IsInt, Min, Max } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EnrollmentStatus } from '../../domain/entities/enrollment.entity';
 
@@ -126,4 +126,148 @@ export class SkillMasteryResponseDto {
 
   @ApiPropertyOptional()
   lastPracticedAt?: Date;
+}
+
+// ============ PROGRESS QUERY DTOs ============
+
+export class ProgressTodayQueryDto {
+  @ApiPropertyOptional({ example: '2026-01-20' })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+}
+
+export class ProgressWeeklyQueryDto {
+  @ApiPropertyOptional({ example: '2026-01-19' })
+  @IsOptional()
+  @IsDateString()
+  weekStart?: string;
+}
+
+export class ReviewQueueQueryDto {
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+
+  @ApiPropertyOptional({ example: '2026-01-20T12:00:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  dueBefore?: string;
+}
+
+// ============ PROGRESS RESPONSE DTOs ============
+
+export class ProgressGoalDto {
+  @ApiProperty()
+  targetMinutes: number;
+
+  @ApiProperty()
+  progressPercent: number;
+
+  @ApiProperty()
+  achieved: boolean;
+}
+
+export class ProgressTodayResponseDto {
+  @ApiProperty()
+  date: string;
+
+  @ApiProperty()
+  minutesLearned: number;
+
+  @ApiProperty()
+  xpEarned: number;
+
+  @ApiProperty()
+  lessonsCompleted: number;
+
+  @ApiProperty()
+  streakDays: number;
+
+  @ApiProperty({ type: ProgressGoalDto })
+  goal: ProgressGoalDto;
+}
+
+export class ProgressWeeklyDayDto {
+  @ApiProperty()
+  date: string;
+
+  @ApiProperty()
+  minutes: number;
+
+  @ApiProperty()
+  xp: number;
+
+  @ApiProperty()
+  lessonsCompleted: number;
+
+  @ApiProperty()
+  goalMet: boolean;
+}
+
+export class ProgressWeeklyResponseDto {
+  @ApiProperty()
+  weekStart: string;
+
+  @ApiProperty()
+  weekEnd: string;
+
+  @ApiProperty({ type: [ProgressWeeklyDayDto] })
+  days: ProgressWeeklyDayDto[];
+}
+
+// ============ REVIEW RESPONSE DTOs ============
+
+export class ReviewSummaryResponseDto {
+  @ApiProperty()
+  dueCount: number;
+
+  @ApiProperty()
+  overdueCount: number;
+
+  @ApiProperty()
+  dueTodayCount: number;
+
+  @ApiPropertyOptional()
+  nextDueAt?: Date;
+}
+
+export class ReviewQueueItemDto {
+  @ApiProperty()
+  reviewQueueId: string;
+
+  @ApiProperty()
+  itemId: string;
+
+  @ApiProperty()
+  dueAt: Date;
+
+  @ApiProperty()
+  priority: number;
+
+  @ApiProperty()
+  source: string;
+}
+
+export class ReviewQueueResponseDto {
+  @ApiProperty({ type: [ReviewQueueItemDto] })
+  items: ReviewQueueItemDto[];
+
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  page: number;
+
+  @ApiProperty()
+  limit: number;
 }

@@ -115,4 +115,38 @@ export class LessonProgressRepository implements ILessonProgressRepository {
       },
     });
   }
+
+  async countCompletedByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<number> {
+    return this.prisma.lesson_progress.count({
+      where: {
+        completed_at: { gte: start, lt: end },
+        enrollments: {
+          user_id: userId,
+        },
+      },
+    });
+  }
+
+  async findCompletedDatesByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<Date[]> {
+    const rows = await this.prisma.lesson_progress.findMany({
+      where: {
+        completed_at: { gte: start, lt: end },
+        enrollments: { user_id: userId },
+      },
+      select: { completed_at: true },
+      orderBy: { completed_at: 'asc' },
+    });
+
+    return rows
+      .map((row) => row.completed_at)
+      .filter((value): value is Date => Boolean(value));
+  }
 }

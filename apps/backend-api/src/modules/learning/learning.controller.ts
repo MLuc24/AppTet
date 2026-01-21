@@ -10,6 +10,8 @@ import {
   Delete,
   Body,
   Param,
+  Query,
+  Headers,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -28,6 +30,13 @@ import {
   CompleteLessonDto,
   CompleteLessonResponseDto,
   CourseProgressResponseDto,
+  ProgressTodayQueryDto,
+  ProgressWeeklyQueryDto,
+  ReviewQueueQueryDto,
+  ProgressTodayResponseDto,
+  ProgressWeeklyResponseDto,
+  ReviewSummaryResponseDto,
+  ReviewQueueResponseDto,
 } from './learning.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -109,5 +118,55 @@ export class LearningController {
     @CurrentUser('userId') userId: string,
   ): Promise<CompleteLessonResponseDto> {
     return this.learningService.completeLesson(userId, lessonId, dto.score);
+  }
+
+  @Get('progress/today')
+  @ApiOperation({ summary: "Get today's progress" })
+  @ApiResponse({ status: 200, type: ProgressTodayResponseDto })
+  async getTodayProgress(
+    @CurrentUser('userId') userId: string,
+    @Query() query: ProgressTodayQueryDto,
+    @Headers('x-timezone') timeZoneHeader?: string,
+  ): Promise<ProgressTodayResponseDto> {
+    return this.learningService.getProgressToday(
+      userId,
+      query.date,
+      timeZoneHeader,
+    );
+  }
+
+  @Get('progress/weekly')
+  @ApiOperation({ summary: 'Get weekly progress' })
+  @ApiResponse({ status: 200, type: ProgressWeeklyResponseDto })
+  async getWeeklyProgress(
+    @CurrentUser('userId') userId: string,
+    @Query() query: ProgressWeeklyQueryDto,
+    @Headers('x-timezone') timeZoneHeader?: string,
+  ): Promise<ProgressWeeklyResponseDto> {
+    return this.learningService.getProgressWeekly(
+      userId,
+      query.weekStart,
+      timeZoneHeader,
+    );
+  }
+
+  @Get('review/summary')
+  @ApiOperation({ summary: 'Get review queue summary' })
+  @ApiResponse({ status: 200, type: ReviewSummaryResponseDto })
+  async getReviewSummary(
+    @CurrentUser('userId') userId: string,
+    @Headers('x-timezone') timeZoneHeader?: string,
+  ): Promise<ReviewSummaryResponseDto> {
+    return this.learningService.getReviewSummary(userId, timeZoneHeader);
+  }
+
+  @Get('review/queue')
+  @ApiOperation({ summary: 'Get review queue items' })
+  @ApiResponse({ status: 200, type: ReviewQueueResponseDto })
+  async getReviewQueue(
+    @CurrentUser('userId') userId: string,
+    @Query() query: ReviewQueueQueryDto,
+  ): Promise<ReviewQueueResponseDto> {
+    return this.learningService.getReviewQueue(userId, query);
   }
 }

@@ -12,5 +12,6 @@ import { MediaModule } from '../media/media.module';
   imports: [MediaModule],
   controllers: [UserController, UserSettingsController, AdminUserController],
   providers: [UserService, PrismaClient, UserRepository, RoleRepository],
+  exports: [UserService],
 })
 export class UserModule {}

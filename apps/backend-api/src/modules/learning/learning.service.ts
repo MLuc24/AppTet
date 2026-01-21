@@ -24,6 +24,10 @@ import {
 import {
   ENROLLMENT_REPOSITORY,
   LESSON_PROGRESS_REPOSITORY,
+  PRACTICE_SESSION_REPOSITORY,
+  REVIEW_QUEUE_REPOSITORY,
+  XP_LEDGER_REPOSITORY,
+  STREAK_REPOSITORY,
 } from './learning.types';
 import {
   COURSE_REPOSITORY,
@@ -35,7 +39,21 @@ import {
   CompleteLessonResponseDto,
   CourseProgressResponseDto,
   LessonProgressResponseDto,
+  ProgressTodayResponseDto,
+  ProgressWeeklyResponseDto,
+  ReviewQueueQueryDto,
+  ReviewQueueResponseDto,
+  ReviewSummaryResponseDto,
 } from './learning.dto';
+import { PracticeSessionRepository } from '../../infrastructure/database/repositories/practice-session.repository';
+import { ReviewQueueRepository } from '../../infrastructure/database/repositories/review-queue.repository';
+import { XpLedgerRepository } from '../../infrastructure/database/repositories/xp-ledger.repository';
+import { StreakRepository } from '../../infrastructure/database/repositories/streak.repository';
+import {
+  getDateStringInTimeZone,
+  getUtcRangeForDate,
+  getWeekStartDateString,
+} from '../../common/utils/timezone.util';
 
 @Injectable()
 export class LearningService {
@@ -50,6 +68,14 @@ export class LearningService {
     private readonly courseVersionRepository: ICourseVersionRepository,
     @Inject(LESSON_REPOSITORY)
     private readonly lessonRepository: ILessonRepository,
+    @Inject(PRACTICE_SESSION_REPOSITORY)
+    private readonly practiceSessionRepository: PracticeSessionRepository,
+    @Inject(REVIEW_QUEUE_REPOSITORY)
+    private readonly reviewQueueRepository: ReviewQueueRepository,
+    @Inject(XP_LEDGER_REPOSITORY)
+    private readonly xpLedgerRepository: XpLedgerRepository,
+    @Inject(STREAK_REPOSITORY)
+    private readonly streakRepository: StreakRepository,
   ) {}
 
   /**
@@ -276,8 +302,184 @@ export class LearningService {
   private async countTotalLessonsInCourse(
     courseVersionId: string,
   ): Promise<number> {
-    // This would ideally be a dedicated query, but for now we return 0
-    // A more efficient approach would add a method to the repository
-    return 0;
+    return this.lessonRepository.countByCourseVersion(courseVersionId);
+  }
+
+  async getProgressToday(
+    userId: string,
+    dateString?: string,
+    timeZoneHeader?: string,
+  ): Promise<ProgressTodayResponseDto> {
+    const timeZone = timeZoneHeader || 'UTC';
+    const resolvedDate =
+      dateString || getDateStringInTimeZone(new Date(), timeZone);
+    const { start, end } = getUtcRangeForDate(resolvedDate, timeZone);
+
+    const [sessions, xpEarned, lessonsCompleted, streak] = await Promise.all([
+      this.practiceSessionRepository.findByUserInRange(userId, start, end),
+      this.xpLedgerRepository.sumByUserInRange(userId, start, end),
+      this.lessonProgressRepository.countCompletedByUserInRange(
+        userId,
+        start,
+        end,
+      ),
+      this.streakRepository.findByUserId(userId),
+    ]);
+
+    const minutesLearned = this.sumMinutes(sessions);
+    const targetMinutes = 20;
+    const progressPercent =
+      targetMinutes > 0
+        ? Math.round((minutesLearned / targetMinutes) * 100)
+        : 0;
+
+    return {
+      date: resolvedDate,
+      minutesLearned,
+      xpEarned,
+      lessonsCompleted,
+      streakDays: streak?.currentDays ?? 0,
+      goal: {
+        targetMinutes,
+        progressPercent,
+        achieved: minutesLearned >= targetMinutes,
+      },
+    };
+  }
+
+  async getProgressWeekly(
+    userId: string,
+    weekStart?: string,
+    timeZoneHeader?: string,
+  ): Promise<ProgressWeeklyResponseDto> {
+    const timeZone = timeZoneHeader || 'UTC';
+    const todayString = getDateStringInTimeZone(new Date(), timeZone);
+    const startDateString = weekStart || getWeekStartDateString(todayString);
+    const { start: weekStartUtc } = getUtcRangeForDate(
+      startDateString,
+      timeZone,
+    );
+    const weekEndUtc = new Date(weekStartUtc.getTime() + 7 * 24 * 60 * 60000);
+    const weekEndString = getDateStringInTimeZone(
+      new Date(weekStartUtc.getTime() + 6 * 24 * 60 * 60000),
+      timeZone,
+    );
+
+    const [sessions, xpEntries, completions] = await Promise.all([
+      this.practiceSessionRepository.findByUserInRange(
+        userId,
+        weekStartUtc,
+        weekEndUtc,
+      ),
+      this.xpLedgerRepository.findByUserInRange(
+        userId,
+        weekStartUtc,
+        weekEndUtc,
+      ),
+      this.lessonProgressRepository.findCompletedDatesByUserInRange(
+        userId,
+        weekStartUtc,
+        weekEndUtc,
+      ),
+    ]);
+
+    const minutesByDate = new Map<string, number>();
+    for (const session of sessions) {
+      const dateKey = getDateStringInTimeZone(session.startedAt, timeZone);
+      const minutes = this.sumMinutes([session]);
+      minutesByDate.set(dateKey, (minutesByDate.get(dateKey) || 0) + minutes);
+    }
+
+    const xpByDate = new Map<string, number>();
+    for (const entry of xpEntries) {
+      const dateKey = getDateStringInTimeZone(entry.createdAt, timeZone);
+      xpByDate.set(dateKey, (xpByDate.get(dateKey) || 0) + entry.xpAmount);
+    }
+
+    const lessonsByDate = new Map<string, number>();
+    for (const completedAt of completions) {
+      const dateKey = getDateStringInTimeZone(completedAt, timeZone);
+      lessonsByDate.set(dateKey, (lessonsByDate.get(dateKey) || 0) + 1);
+    }
+
+    const days = [];
+    for (let i = 0; i < 7; i += 1) {
+      const dayDate = new Date(weekStartUtc.getTime() + i * 24 * 60 * 60000);
+      const dateKey = getDateStringInTimeZone(dayDate, timeZone);
+      const minutes = minutesByDate.get(dateKey) || 0;
+      days.push({
+        date: dateKey,
+        minutes,
+        xp: xpByDate.get(dateKey) || 0,
+        lessonsCompleted: lessonsByDate.get(dateKey) || 0,
+        goalMet: minutes >= 20,
+      });
+    }
+
+    return {
+      weekStart: startDateString,
+      weekEnd: weekEndString,
+      days,
+    };
+  }
+
+  async getReviewSummary(
+    userId: string,
+    timeZoneHeader?: string,
+  ): Promise<ReviewSummaryResponseDto> {
+    const timeZone = timeZoneHeader || 'UTC';
+    const todayString = getDateStringInTimeZone(new Date(), timeZone);
+    const { start, end } = getUtcRangeForDate(todayString, timeZone);
+    const summary = await this.reviewQueueRepository.getSummary(
+      userId,
+      start,
+      end,
+      new Date(),
+    );
+
+    return {
+      dueCount: summary.dueCount,
+      overdueCount: summary.overdueCount,
+      dueTodayCount: summary.dueTodayCount,
+      nextDueAt: summary.nextDueAt,
+    };
+  }
+
+  async getReviewQueue(
+    userId: string,
+    query: ReviewQueueQueryDto,
+  ): Promise<ReviewQueueResponseDto> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit =
+      query.limit && query.limit > 0 ? Math.min(query.limit, 100) : 20;
+    const skip = (page - 1) * limit;
+    const dueBefore = query.dueBefore ? new Date(query.dueBefore) : undefined;
+
+    const { items, total } = await this.reviewQueueRepository.findQueue(
+      userId,
+      skip,
+      limit,
+      dueBefore,
+    );
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  private sumMinutes(
+    sessions: Array<{ startedAt: Date; endedAt?: Date }>,
+  ): number {
+    const totalSeconds = sessions.reduce((sum, session) => {
+      if (!session.endedAt) return sum;
+      const delta = session.endedAt.getTime() - session.startedAt.getTime();
+      if (delta <= 0) return sum;
+      return sum + delta / 1000;
+    }, 0);
+
+    return Math.round(totalSeconds / 60);
   }
 }

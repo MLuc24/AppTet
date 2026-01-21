@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators';
 import { NotificationService } from './notification.service';
@@ -12,6 +12,16 @@ import {
 @Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
+
+  @Get('summary')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get notification summary for current user' })
+  @ApiResponse({ status: 200, description: 'Notification summary' })
+  async getSummary(@CurrentUser('userId') userId: string): Promise<{
+    unreadCount: number;
+  }> {
+    return this.notificationService.getSummary(userId);
+  }
 
   @Post('push-tokens')
   @ApiBearerAuth()

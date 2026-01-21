@@ -10,6 +10,10 @@ import { LearningService } from './learning.service';
 import {
   ENROLLMENT_REPOSITORY,
   LESSON_PROGRESS_REPOSITORY,
+  PRACTICE_SESSION_REPOSITORY,
+  REVIEW_QUEUE_REPOSITORY,
+  XP_LEDGER_REPOSITORY,
+  STREAK_REPOSITORY,
 } from './learning.types';
 import {
   COURSE_REPOSITORY,
@@ -21,6 +25,10 @@ import { LessonProgressRepository } from '../../infrastructure/database/reposito
 import { CourseRepository } from '../../infrastructure/database/repositories/course.repository';
 import { CourseVersionRepository } from '../../infrastructure/database/repositories/course-version.repository';
 import { LessonRepository } from '../../infrastructure/database/repositories/lesson.repository';
+import { PracticeSessionRepository } from '../../infrastructure/database/repositories/practice-session.repository';
+import { ReviewQueueRepository } from '../../infrastructure/database/repositories/review-queue.repository';
+import { XpLedgerRepository } from '../../infrastructure/database/repositories/xp-ledger.repository';
+import { StreakRepository } from '../../infrastructure/database/repositories/streak.repository';
 
 @Module({
   controllers: [LearningController],
@@ -50,7 +58,31 @@ import { LessonRepository } from '../../infrastructure/database/repositories/les
       provide: LESSON_REPOSITORY,
       useClass: LessonRepository,
     },
+    {
+      provide: PRACTICE_SESSION_REPOSITORY,
+      useClass: PracticeSessionRepository,
+    },
+    {
+      provide: REVIEW_QUEUE_REPOSITORY,
+      useClass: ReviewQueueRepository,
+    },
+    {
+      provide: XP_LEDGER_REPOSITORY,
+      useClass: XpLedgerRepository,
+    },
+    {
+      provide: STREAK_REPOSITORY,
+      useClass: StreakRepository,
+    },
   ],
-  exports: [LearningService, ENROLLMENT_REPOSITORY],
+  exports: [
+    LearningService,
+    ENROLLMENT_REPOSITORY,
+    LESSON_PROGRESS_REPOSITORY,
+    PRACTICE_SESSION_REPOSITORY,
+    REVIEW_QUEUE_REPOSITORY,
+    XP_LEDGER_REPOSITORY,
+    STREAK_REPOSITORY,
+  ],
 })
 export class LearningModule {}

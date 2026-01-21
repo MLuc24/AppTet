@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { DeviceEntity } from '../../domain/entities/device.entity';
 import { DeviceRepository } from '../../infrastructure/database/repositories/device.repository';
 import { PushTokenRepository } from '../../infrastructure/database/repositories/push-token.repository';
+import { NotificationRepository } from '../../infrastructure/database/repositories/notification.repository';
 import { FirebaseAdminService } from './firebase-admin.service';
 import {
   DeactivatePushTokenDto,
@@ -16,6 +17,7 @@ export class NotificationService {
   constructor(
     private readonly deviceRepository: DeviceRepository,
     private readonly pushTokenRepository: PushTokenRepository,
+    private readonly notificationRepository: NotificationRepository,
     private readonly firebaseAdminService: FirebaseAdminService,
   ) {}
 
@@ -131,5 +133,11 @@ export class NotificationService {
       successCount: result.successCount,
       failureCount: result.failureCount,
     };
+  }
+
+  async getSummary(userId: string): Promise<{ unreadCount: number }> {
+    const unreadCount =
+      await this.notificationRepository.countUnreadByUserId(userId);
+    return { unreadCount };
   }
 }
