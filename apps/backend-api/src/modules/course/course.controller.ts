@@ -43,4 +43,16 @@ export class CourseController {
   ): Promise<CourseResponseDto> {
     return this.courseService.getCourseById(id, languageId);
   }
+
+  @Get(':id/structure')
+  @ApiOperation({ summary: 'Get course with full structure (units, skills, lessons)' })
+  @ApiParam({ name: 'id', description: 'Course ID' })
+  @ApiResponse({ status: 200, description: 'Course with full structure' })
+  @ApiResponse({ status: 404, description: 'Course not found' })
+  async getCourseStructure(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('languageId') languageId?: number,
+  ) {
+    return this.courseService.getCourseStructure(id, languageId);
+  }
 }

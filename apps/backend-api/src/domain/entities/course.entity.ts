@@ -17,6 +17,7 @@ export interface CourseProps {
   levelId: number;
   courseCode: string;
   isPublished: boolean;
+  coverAssetId?: string;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +54,10 @@ export class CourseEntity {
 
   get isPublished(): boolean {
     return this.props.isPublished;
+  }
+
+  get coverAssetId(): string | undefined {
+    return this.props.coverAssetId;
   }
 
   get createdBy(): string | undefined {

@@ -9,6 +9,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import { ICourseRepository } from '../../domain/ports/course-repository.port';
 import { ICourseVersionRepository } from '../../domain/ports/course-version-repository.port';
 import { CourseEntity } from '../../domain/entities/course.entity';
@@ -39,6 +40,7 @@ export class CourseService {
     private readonly courseRepository: ICourseRepository,
     @Inject(COURSE_VERSION_REPOSITORY)
     private readonly courseVersionRepository: ICourseVersionRepository,
+    private readonly prisma: PrismaClient,
   ) {}
 
   async createCourse(
@@ -57,6 +59,7 @@ export class CourseService {
       baseLanguageId: dto.baseLanguageId,
       levelId: dto.levelId,
       courseCode: dto.courseCode,
+      coverAssetId: dto.coverAssetId,
       createdBy: userId,
       localizations: dto.localizations?.map((l) => ({
         languageId: l.languageId,
@@ -110,8 +113,12 @@ export class CourseService {
       this.courseRepository.countByFilter(filter),
     ]);
 
+    const data = await Promise.all(
+      courses.map((c) => this.toResponseDto(c, query.languageId)),
+    );
+
     return {
-      data: courses.map((c) => this.toResponseDto(c, query.languageId)),
+      data,
       total,
       page,
       limit,
@@ -141,6 +148,7 @@ export class CourseService {
       baseLanguageId: dto.baseLanguageId,
       levelId: dto.levelId,
       courseCode: dto.courseCode,
+      coverAssetId: dto.coverAssetId,
     });
 
     return this.toResponseDto(updated);
@@ -246,10 +254,114 @@ export class CourseService {
     await this.courseRepository.deleteLocalization(courseId, languageId);
   }
 
-  private toResponseDto(
-    course: CourseEntity,
-    languageId?: number,
-  ): CourseResponseDto {
+  async getCourseStructure(courseId: string, languageId?: number) {
+    const course = await this.courseRepository.findById(courseId, languageId);
+    if (!course) {
+      throw new NotFoundException(COURSE_MESSAGES.NOT_FOUND);
+    }
+
+    // Fetch full course structure with units, skills, and lessons through course_versions
+    const structure = await this.prisma.courses.findUnique({
+      where: { course_id: courseId },
+      include: {
+        course_localizations: true,
+        course_versions: {
+          where: { status: 'published' },
+          include: {
+            units: {
+              include: {
+                unit_localizations: true,
+                skills: {
+                  include: {
+                    skill_localizations: true,
+                    lessons: {
+                      include: {
+                        lesson_localizations: true,
+                      },
+                      orderBy: { order_index: 'asc' },
+                    },
+                  },
+                  orderBy: { order_index: 'asc' },
+                },
+              },
+              orderBy: { order_index: 'asc' },
+            },
+          },
+          take: 1,
+        },
+      },
+    });
+
+    // Fetch cover URL if coverAssetId exists
+    let coverUrl: string | undefined;
+    if (structure?.cover_asset_id) {
+      const asset = await this.prisma.media_assets.findUnique({
+        where: { asset_id: structure.cover_asset_id },
+        select: { public_url: true, file_url: true },
+      });
+      
+      if (asset) {
+        // Return publicUrl if available, otherwise construct from fileUrl
+        if (asset.public_url) {
+          coverUrl = asset.public_url;
+        } else if (asset.file_url) {
+          // Construct public URL from fileUrl (format: bucket/path/to/file)
+          const r2PublicUrl = process.env.R2_PUBLIC_URL;
+          if (r2PublicUrl && asset.file_url.startsWith('lms-files/')) {
+            // Extract path after bucket name
+            const path = asset.file_url.replace('lms-files/', '');
+            coverUrl = `${r2PublicUrl}/${path}`;
+          } else {
+            // Fallback to fileUrl (will be handled by frontend)
+            coverUrl = asset.file_url;
+          }
+        }
+      }
+    }
+
+    // Get published version's units
+    const publishedVersion = structure?.course_versions?.[0];
+    const units = publishedVersion?.units || [];
+
+    // Transform to match frontend expectations
+    const transformedUnits = units.map((unit) => ({
+      unitId: unit.unit_id,
+      courseVersionId: unit.course_version_id,
+      orderIndex: unit.order_index,
+      title: unit.unit_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+      description: unit.unit_localizations?.find(l => !languageId || l.language_id === languageId)?.description,
+      localizations: unit.unit_localizations?.map(l => ({
+        languageId: l.language_id,
+        title: l.title,
+        description: l.description,
+      })),
+      skills: unit.skills?.map((skill) => ({
+        skillId: skill.skill_id,
+        unitId: skill.unit_id,
+        skillType: skill.skill_type,
+        orderIndex: skill.order_index,
+        title: skill.skill_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+        description: skill.skill_localizations?.find(l => !languageId || l.language_id === languageId)?.description,
+        localizations: skill.skill_localizations?.map(l => ({
+          languageId: l.language_id,
+          title: l.title,
+          description: l.description,
+        })),
+        lessons: skill.lessons?.map((lesson) => ({
+          lessonId: lesson.lesson_id,
+          skillId: lesson.skill_id,
+          lessonType: lesson.lesson_type,
+          orderIndex: lesson.order_index,
+          title: lesson.lesson_localizations?.find(l => !languageId || l.language_id === languageId)?.title,
+          localizations: lesson.lesson_localizations?.map(l => ({
+            languageId: l.language_id,
+            title: l.title,
+          })),
+        })),
+      })),
+    }));
+
+    // Get localization for course
     const localization = languageId
       ? course.localizations.find((l) => l.languageId === languageId)
       : course.localizations[0];
@@ -261,6 +373,63 @@ export class CourseService {
       baseLanguageId: course.baseLanguageId,
       levelId: course.levelId,
       isPublished: course.isPublished,
+      coverAssetId: course.coverAssetId,
+      coverUrl,
+      localizations: course.localizations.map((l) => ({
+        languageId: l.languageId,
+        title: l.title,
+        description: l.description,
+      })),
+      title: localization?.title,
+      description: localization?.description,
+      units: transformedUnits,
+    };
+  }
+
+  private async toResponseDto(
+    course: CourseEntity,
+    languageId?: number,
+  ): Promise<CourseResponseDto> {
+    const localization = languageId
+      ? course.localizations.find((l) => l.languageId === languageId)
+      : course.localizations[0];
+
+    // Fetch cover URL if coverAssetId exists
+    let coverUrl: string | undefined;
+    if (course.coverAssetId) {
+      const asset = await this.prisma.media_assets.findUnique({
+        where: { asset_id: course.coverAssetId },
+        select: { public_url: true, file_url: true },
+      });
+      
+      if (asset) {
+        // Return publicUrl if available, otherwise construct from fileUrl
+        if (asset.public_url) {
+          coverUrl = asset.public_url;
+        } else if (asset.file_url) {
+          // Construct public URL from fileUrl (format: bucket/path/to/file)
+          const r2PublicUrl = process.env.R2_PUBLIC_URL;
+          if (r2PublicUrl && asset.file_url.startsWith('lms-files/')) {
+            // Extract path after bucket name
+            const path = asset.file_url.replace('lms-files/', '');
+            coverUrl = `${r2PublicUrl}/${path}`;
+          } else {
+            // Fallback to fileUrl (will be handled by frontend)
+            coverUrl = asset.file_url;
+          }
+        }
+      }
+    }
+
+    return {
+      courseId: course.courseId,
+      courseCode: course.courseCode,
+      targetLanguageId: course.targetLanguageId,
+      baseLanguageId: course.baseLanguageId,
+      levelId: course.levelId,
+      isPublished: course.isPublished,
+      coverAssetId: course.coverAssetId,
+      coverUrl,
       localizations: course.localizations.map((l) => ({
         languageId: l.languageId,
         title: l.title,
