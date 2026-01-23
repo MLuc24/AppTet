@@ -3,8 +3,19 @@
  * Manages practice sessions and attempts
  */
 
-import { PracticeSessionEntity, Attempt, AttemptResponse } from '../entities/practice-session.entity';
+import {
+  PracticeSessionEntity,
+  Attempt,
+  AttemptResponse,
+} from '../entities/practice-session.entity';
 import { SessionMode } from '../../modules/exercise/exercise.types';
+
+export interface PracticeSessionRecord {
+  sessionId: string;
+  lessonId: string;
+  startedAt: Date;
+  endedAt?: Date;
+}
 
 export interface CreateSessionData {
   userId: string;
@@ -30,15 +41,30 @@ export interface CreateResponseData {
 export interface IPracticeSessionRepository {
   // Session methods
   findById(sessionId: string): Promise<PracticeSessionEntity | null>;
-  findByUserAndLesson(userId: string, lessonId: string): Promise<PracticeSessionEntity | null>;
-  findActiveByUserAndLesson(userId: string, lessonId: string): Promise<PracticeSessionEntity | null>;
+  findByUserAndLesson(
+    userId: string,
+    lessonId: string,
+  ): Promise<PracticeSessionEntity | null>;
+  findActiveByUserAndLesson(
+    userId: string,
+    lessonId: string,
+  ): Promise<PracticeSessionEntity | null>;
+  findByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<PracticeSessionRecord[]>;
   createSession(data: CreateSessionData): Promise<PracticeSessionEntity>;
   completeSession(sessionId: string): Promise<PracticeSessionEntity>;
 
   // Attempt methods
   createAttempt(data: CreateAttemptData): Promise<Attempt>;
   findAttemptById(attemptId: string): Promise<Attempt | null>;
-  completeAttempt(attemptId: string, totalScore: number, maxScore: number): Promise<Attempt>;
+  completeAttempt(
+    attemptId: string,
+    totalScore: number,
+    maxScore: number,
+  ): Promise<Attempt>;
 
   // Response methods
   createResponse(data: CreateResponseData): Promise<AttemptResponse>;
