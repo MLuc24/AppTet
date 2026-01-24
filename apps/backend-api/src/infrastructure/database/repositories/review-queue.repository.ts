@@ -87,4 +87,12 @@ export class ReviewQueueRepository {
       total,
     };
   }
+  async removeByUserAndItem(userId: string, itemId: string): Promise<void> {
+    await this.prisma.review_queue.deleteMany({
+      where: {
+        user_id: userId,
+        item_id: itemId,
+      },
+    });
+  }
 }

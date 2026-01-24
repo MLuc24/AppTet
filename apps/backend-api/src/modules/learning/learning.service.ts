@@ -482,4 +482,208 @@ export class LearningService {
 
     return Math.round(totalSeconds / 60);
   }
+
+  // ============ NEW WRITE METHODS ============
+
+  async startPracticeSession(
+    userId: string,
+    lessonId: string,
+    mode: string,
+  ): Promise<{
+    sessionId: string;
+    lessonId: string;
+    mode: string;
+    startedAt: Date;
+  }> {
+    const lesson = await this.lessonRepository.findById(lessonId);
+    if (!lesson) {
+      throw new LessonNotFoundError(lessonId);
+    }
+
+    // Check if there's an active session
+    const activeSession =
+      await this.practiceSessionRepository.findActiveByUserAndLesson(
+        userId,
+        lessonId,
+      );
+
+    if (activeSession) {
+      const json = activeSession.toJSON();
+      return {
+        sessionId: json.sessionId,
+        lessonId: json.lessonId,
+        mode: json.mode,
+        startedAt: json.startedAt,
+      };
+    }
+
+    // Create new session
+    const session = await this.practiceSessionRepository.createSession({
+      userId,
+      lessonId,
+      mode: mode as any,
+    });
+
+    const json = session.toJSON();
+    return {
+      sessionId: json.sessionId,
+      lessonId: json.lessonId,
+      mode: json.mode,
+      startedAt: json.startedAt,
+    };
+  }
+
+  async endPracticeSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<{
+    sessionId: string;
+    endedAt: Date;
+    durationMinutes: number;
+  }> {
+    const session = await this.practiceSessionRepository.findById(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    const json = session.toJSON();
+    if (json.userId !== userId) {
+      throw new Error('Unauthorized');
+    }
+
+    if (json.endedAt) {
+      const duration = Math.round(
+        (json.endedAt.getTime() - json.startedAt.getTime()) / 60000,
+      );
+      return {
+        sessionId: json.sessionId,
+        endedAt: json.endedAt,
+        durationMinutes: duration,
+      };
+    }
+
+    const completedSession =
+      await this.practiceSessionRepository.completeSession(sessionId);
+    const completedJson = completedSession.toJSON();
+
+    const duration = Math.round(
+      (completedJson.endedAt!.getTime() - completedJson.startedAt.getTime()) /
+        60000,
+    );
+
+    // Update streak if this is a new day
+    await this.updateStreakIfNeeded(userId);
+
+    return {
+      sessionId: completedJson.sessionId,
+      endedAt: completedJson.endedAt!,
+      durationMinutes: duration,
+    };
+  }
+
+  async submitReview(
+    userId: string,
+    itemId: string,
+    isCorrect: boolean,
+    userAnswer?: string,
+  ): Promise<{
+    success: boolean;
+    itemId: string;
+    nextReviewAt: Date;
+    newStage: number;
+    intervalDays: number;
+  }> {
+    // Remove from review queue
+    await this.reviewQueueRepository.removeByUserAndItem(userId, itemId);
+
+    // Update SRS schedule using SM-2 algorithm
+    const schedule = await this.updateSRSSchedule(userId, itemId, isCorrect);
+
+    return {
+      success: true,
+      itemId,
+      nextReviewAt: schedule.nextReviewAt,
+      newStage: schedule.stage,
+      intervalDays: schedule.intervalDays,
+    };
+  }
+
+  private async updateStreakIfNeeded(userId: string): Promise<void> {
+    const streak = await this.streakRepository.findByUserId(userId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!streak) {
+      await this.streakRepository.upsert({
+        userId,
+        currentDays: 1,
+        longestDays: 1,
+        lastActivityDate: today,
+        freezeCount: 0,
+      });
+      return;
+    }
+
+    const lastActivity = streak.lastActivityDate
+      ? new Date(streak.lastActivityDate)
+      : null;
+    if (lastActivity) {
+      lastActivity.setHours(0, 0, 0, 0);
+    }
+
+    // If already logged today, do nothing
+    if (lastActivity && lastActivity.getTime() === today.getTime()) {
+      return;
+    }
+
+    // Calculate days difference
+    const daysDiff = lastActivity
+      ? Math.floor((today.getTime() - lastActivity.getTime()) / 86400000)
+      : 999;
+
+    let newCurrentDays = streak.currentDays;
+    let newLongestDays = streak.longestDays;
+
+    if (daysDiff === 1) {
+      // Consecutive day
+      newCurrentDays += 1;
+      newLongestDays = Math.max(newLongestDays, newCurrentDays);
+    } else if (daysDiff > 1) {
+      // Streak broken
+      newCurrentDays = 1;
+    }
+
+    await this.streakRepository.upsert({
+      userId,
+      currentDays: newCurrentDays,
+      longestDays: newLongestDays,
+      lastActivityDate: today,
+      freezeCount: streak.freezeCount,
+    });
+  }
+
+  private async updateSRSSchedule(
+    userId: string,
+    itemId: string,
+    isCorrect: boolean,
+  ): Promise<{
+    stage: number;
+    intervalDays: number;
+    easeFactor: number;
+    nextReviewAt: Date;
+  }> {
+    // This is a placeholder - you'll need to implement SRS repository
+    // For now, return a simple schedule
+    const now = new Date();
+    const stage = isCorrect ? 1 : 0;
+    const intervalDays = isCorrect ? 1 : 0;
+    const nextReviewAt = new Date(now.getTime() + intervalDays * 86400000);
+
+    return {
+      stage,
+      intervalDays,
+      easeFactor: 2.5,
+      nextReviewAt,
+    };
+  }
 }

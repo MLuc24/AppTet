@@ -140,4 +140,56 @@ export class NotificationService {
       await this.notificationRepository.countUnreadByUserId(userId);
     return { unreadCount };
   }
+
+  async markAsRead(
+    userId: string,
+    notificationId: string,
+  ): Promise<{ success: boolean; notificationId: string; readAt: Date }> {
+    const notification = await this.notificationRepository.findById(
+      notificationId,
+      userId,
+    );
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    if (notification.read_at) {
+      return {
+        success: true,
+        notificationId,
+        readAt: notification.read_at,
+      };
+    }
+
+    const readAt = await this.notificationRepository.markAsRead(
+      notificationId,
+      userId,
+    );
+
+    this.logger.log(
+      `Notification ${notificationId} marked as read for user ${userId}`,
+    );
+
+    return {
+      success: true,
+      notificationId,
+      readAt,
+    };
+  }
+
+  async markAllAsRead(
+    userId: string,
+  ): Promise<{ success: boolean; markedCount: number }> {
+    const markedCount = await this.notificationRepository.markAllAsRead(userId);
+
+    this.logger.log(
+      `Marked ${markedCount} notifications as read for user ${userId}`,
+    );
+
+    return {
+      success: true,
+      markedCount,
+    };
+  }
 }

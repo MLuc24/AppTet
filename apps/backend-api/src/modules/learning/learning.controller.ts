@@ -15,6 +15,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -168,5 +169,41 @@ export class LearningController {
     @Query() query: ReviewQueueQueryDto,
   ): Promise<ReviewQueueResponseDto> {
     return this.learningService.getReviewQueue(userId, query);
+  }
+
+  @Post('lessons/:lessonId/practice/start')
+  @ApiOperation({ summary: 'Start a practice session for a lesson' })
+  @ApiParam({ name: 'lessonId', description: 'Lesson ID' })
+  @ApiResponse({ status: 201, description: 'Practice session started' })
+  @ApiResponse({ status: 404, description: 'Lesson not found' })
+  async startPracticeSession(
+    @Param('lessonId') lessonId: string,
+    @Body() dto: any,
+    @CurrentUser('userId') userId: string,
+  ): Promise<any> {
+    return this.learningService.startPracticeSession(userId, lessonId, dto.mode || 'learn');
+  }
+
+  @Put('practice-sessions/:sessionId/end')
+  @ApiOperation({ summary: 'End a practice session' })
+  @ApiParam({ name: 'sessionId', description: 'Session ID' })
+  @ApiResponse({ status: 200, description: 'Practice session ended' })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  async endPracticeSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser('userId') userId: string,
+  ): Promise<any> {
+    return this.learningService.endPracticeSession(userId, sessionId);
+  }
+
+  @Post('review/submit')
+  @ApiOperation({ summary: 'Submit a review answer' })
+  @ApiResponse({ status: 200, description: 'Review submitted successfully' })
+  @ApiResponse({ status: 404, description: 'Review item not found' })
+  async submitReview(
+    @Body() dto: any,
+    @CurrentUser('userId') userId: string,
+  ): Promise<any> {
+    return this.learningService.submitReview(userId, dto.itemId, dto.isCorrect, dto.userAnswer);
   }
 }
