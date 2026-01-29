@@ -41,6 +41,7 @@ export class JwtTokenService implements ITokenService {
         sub: payload.sub,
         email: payload.email,
         phone: payload.phone,
+        roles: payload.roles,
       } as any,
       {
         expiresIn: this.accessTokenExpiration,
@@ -80,11 +81,13 @@ export class JwtTokenService implements ITokenService {
         sub: string;
         email?: string;
         phone?: string;
+        roles?: string[];
       }>(token);
       return {
         sub: payload.sub,
         email: payload.email,
         phone: payload.phone,
+        roles: payload.roles,
       };
     } catch (error) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {

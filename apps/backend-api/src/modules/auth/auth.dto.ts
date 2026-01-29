@@ -216,8 +216,14 @@ export class UserResponseDto {
   @ApiPropertyOptional()
   avatarAssetId?: string;
 
+  @ApiPropertyOptional()
+  avatarUrl?: string;
+
   @ApiProperty({ enum: ['active', 'suspended', 'deleted'] })
   status: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  roles?: string[];
 
   @ApiPropertyOptional()
   lastLoginAt?: Date;

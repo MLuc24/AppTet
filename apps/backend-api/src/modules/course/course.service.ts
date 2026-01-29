@@ -46,11 +46,29 @@ export class CourseService {
   async createCourse(
     dto: CreateCourseDto,
     userId?: string,
+    coverImageFile?: Express.Multer.File,
   ): Promise<CourseResponseDto> {
-    // Check if course code already exists
-    const exists = await this.courseRepository.existsByCode(dto.courseCode);
-    if (exists) {
-      throw new ConflictException(COURSE_MESSAGES.CODE_EXISTS);
+    // Generate course code if not provided
+    let courseCode = dto.courseCode;
+    if (!courseCode) {
+      courseCode = await this.generateCourseCode(
+        dto.targetLanguageId,
+        dto.levelId,
+      );
+    } else {
+      // Check if provided course code already exists
+      const exists = await this.courseRepository.existsByCode(courseCode);
+      if (exists) {
+        throw new ConflictException(COURSE_MESSAGES.CODE_EXISTS);
+      }
+    }
+
+    // Upload cover image if provided
+    let coverAssetId: string | undefined;
+    if (coverImageFile) {
+      // TODO: Implement file upload to R2/S3 and create media_asset record
+      // For now, we'll skip this and implement it separately
+      // coverAssetId = await this.uploadCoverImage(coverImageFile, userId);
     }
 
     // Create course
@@ -58,8 +76,8 @@ export class CourseService {
       targetLanguageId: dto.targetLanguageId,
       baseLanguageId: dto.baseLanguageId,
       levelId: dto.levelId,
-      courseCode: dto.courseCode,
-      coverAssetId: dto.coverAssetId,
+      courseCode,
+      coverAssetId,
       createdBy: userId,
       localizations: dto.localizations?.map((l) => ({
         languageId: l.languageId,
@@ -77,6 +95,72 @@ export class CourseService {
     });
 
     return this.toResponseDto(course, dto.localizations?.[0]?.languageId);
+  }
+
+  /**
+   * Generate unique course code based on target language and level
+   * Format: {LANG_CODE}-{LEVEL_CODE}-{SEQUENCE}
+   * Example: EN-A1-001, VN-B2-003
+   */
+  private async generateCourseCode(
+    targetLanguageId: number,
+    levelId: number,
+  ): Promise<string> {
+    // Fetch language and level codes
+    const [language, level] = await Promise.all([
+      this.prisma.languages.findUnique({
+        where: { language_id: targetLanguageId },
+        select: { code: true },
+      }),
+      this.prisma.proficiency_levels.findUnique({
+        where: { level_id: levelId },
+        select: { code: true },
+      }),
+    ]);
+
+    if (!language || !level) {
+      throw new ConflictException('Invalid language or level ID');
+    }
+
+    const langCode = language.code.toUpperCase();
+    const levelCode = level.code.toUpperCase();
+
+    // Find the next sequence number for this language-level combination
+    const existingCourses = await this.prisma.courses.findMany({
+      where: {
+        target_language_id: targetLanguageId,
+        level_id: levelId,
+      },
+      select: { course_code: true },
+      orderBy: { course_code: 'desc' },
+    });
+
+    let sequence = 1;
+    if (existingCourses.length > 0) {
+      // Extract sequence numbers from existing codes
+      const sequences = existingCourses
+        .map((c) => {
+          const match = c.course_code.match(/-(\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter((n) => n > 0);
+
+      if (sequences.length > 0) {
+        sequence = Math.max(...sequences) + 1;
+      }
+    }
+
+    // Format: EN-A1-001
+    const courseCode = `${langCode}-${levelCode}-${sequence.toString().padStart(3, '0')}`;
+
+    // Double-check uniqueness
+    const exists = await this.courseRepository.existsByCode(courseCode);
+    if (exists) {
+      // Fallback: add timestamp suffix
+      return `${courseCode}-${Date.now()}`;
+    }
+
+    return courseCode;
   }
 
   async getCourseById(
@@ -394,6 +478,25 @@ export class CourseService {
       ? course.localizations.find((l) => l.languageId === languageId)
       : course.localizations[0];
 
+    // Fetch current version ID (prefer PUBLISHED, fallback to DRAFT)
+    let currentVersionId: string | undefined;
+    const currentVersion = await this.prisma.course_versions.findFirst({
+      where: {
+        course_id: course.courseId,
+        status: { in: ['published', 'draft'] }, // lowercase to match DB
+      },
+      orderBy: [
+        { status: 'desc' }, // 'published' comes before 'draft' alphabetically
+        { version_number: 'desc' },
+      ],
+      select: {
+        course_version_id: true,
+      },
+    });
+    if (currentVersion) {
+      currentVersionId = currentVersion.course_version_id;
+    }
+
     // Fetch cover URL if coverAssetId exists
     let coverUrl: string | undefined;
     if (course.coverAssetId) {
@@ -430,6 +533,7 @@ export class CourseService {
       isPublished: course.isPublished,
       coverAssetId: course.coverAssetId,
       coverUrl,
+      currentVersionId,
       localizations: course.localizations.map((l) => ({
         languageId: l.languageId,
         title: l.title,

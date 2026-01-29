@@ -56,17 +56,18 @@ export class CreateCourseDto {
   @IsInt()
   levelId: number;
 
-  @ApiProperty({ example: 'EN-A1-001', description: 'Unique course code' })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(3)
-  @MaxLength(50)
-  courseCode: string;
-
-  @ApiPropertyOptional({ description: 'Cover image asset ID' })
+  @ApiPropertyOptional({
+    example: 'EN-A1-001',
+    description: 'Unique course code (auto-generated if not provided)',
+  })
   @IsOptional()
   @IsString()
-  coverAssetId?: string;
+  @MinLength(3)
+  @MaxLength(50)
+  courseCode?: string;
+
+  @ApiPropertyOptional({ description: 'Cover image file (multipart/form-data)' })
+  coverImage?: any; // Will be handled by multer
 
   @ApiPropertyOptional({ type: [LocalizationDto] })
   @IsOptional()
@@ -212,6 +213,9 @@ export class CourseResponseDto {
 
   @ApiPropertyOptional()
   coverUrl?: string;
+
+  @ApiPropertyOptional()
+  currentVersionId?: string;
 
   @ApiProperty({ type: [CourseLocalizationResponseDto] })
   localizations: CourseLocalizationResponseDto[];

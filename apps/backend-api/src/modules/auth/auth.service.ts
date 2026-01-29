@@ -21,6 +21,8 @@ import { IEmailService } from '../../domain/ports/email-service.port';
 import { IRefreshTokenRepository } from '../../domain/ports/refresh-token-repository.port';
 import { IDeviceRepository } from '../../domain/ports/device-repository.port';
 import { DeviceEntity } from '../../domain/entities/device.entity';
+import { RoleEntity } from '../../domain/entities/role.entity';
+import { MediaService } from '../media/media.service';
 import {
   RegisterDto,
   LoginDto,
@@ -62,6 +64,7 @@ export class AuthService {
     @Inject(EMAIL_SERVICE)
     private readonly emailService: IEmailService,
     private readonly configService: ConfigService,
+    private readonly mediaService: MediaService,
   ) {}
 
   /**
@@ -164,7 +167,7 @@ export class AuthService {
     }
 
     return {
-      user: this.mapUserToResponse(user.toPublicObject()),
+      user: await this.mapUserToResponse(user.toPublicObject()),
       message: 'Registration successful',
     };
   }
@@ -265,11 +268,16 @@ export class AuthService {
       deviceId = device.id;
     }
 
+    // Get user roles
+    const userRoles = await this.roleRepository.getUserRoles(user.userId);
+    const roleCodes = userRoles.map((role: RoleEntity) => role.code);
+
     // Generate tokens
     const accessToken = await this.tokenService.generateAccessToken({
       sub: user.userId,
       email: user.email,
       phone: user.phone,
+      roles: roleCodes,
     });
 
     const refreshToken = await this.tokenService.generateRefreshToken({
@@ -309,7 +317,7 @@ export class AuthService {
       accessToken,
       refreshToken,
       expiresIn: 900, // 15 minutes in seconds
-      user: this.mapUserToResponse(updatedUser.toPublicObject()),
+      user: await this.mapUserToResponseWithRoles(updatedUser.toPublicObject()),
     };
   }
 
@@ -339,10 +347,15 @@ export class AuthService {
         throw new UnauthorizedException('Invalid token');
       }
 
+      // Get user roles
+      const userRoles = await this.roleRepository.getUserRoles(user.userId);
+      const roleCodes = userRoles.map((role: RoleEntity) => role.code);
+
       const accessToken = await this.tokenService.generateAccessToken({
         sub: user.userId,
         email: user.email,
         phone: user.phone,
+        roles: roleCodes,
       });
 
       return {
@@ -394,7 +407,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.mapUserToResponse(user.toPublicObject());
+    return await this.mapUserToResponseWithRoles(user.toPublicObject());
   }
 
   /**
@@ -434,13 +447,52 @@ export class AuthService {
   }
 
   // Helper methods
-  private mapUserToResponse(user: any): UserResponseDto {
+  private async getAvatarUrl(avatarAssetId?: string): Promise<string | undefined> {
+    if (!avatarAssetId) {
+      return undefined;
+    }
+
+    try {
+      const asset = await this.mediaService.getAssetById(avatarAssetId);
+      // Return publicUrl for direct browser access, fallback to fileUrl
+      return asset?.publicUrl || asset?.fileUrl;
+    } catch (error) {
+      // If asset not found, return undefined
+      return undefined;
+    }
+  }
+
+  private async mapUserToResponseWithRoles(
+    user: any,
+  ): Promise<UserResponseDto> {
+    const userRoles = await this.roleRepository.getUserRoles(user.userId);
+    const roleCodes = userRoles.map((role: RoleEntity) => role.code);
+    const avatarUrl = await this.getAvatarUrl(user.avatarAssetId);
+
     return {
       userId: user.userId,
       email: user.email,
       phone: user.phone,
       displayName: user.displayName,
       avatarAssetId: user.avatarAssetId,
+      avatarUrl,
+      status: user.status,
+      roles: roleCodes,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+    };
+  }
+
+  private async mapUserToResponse(user: any): Promise<UserResponseDto> {
+    const avatarUrl = await this.getAvatarUrl(user.avatarAssetId);
+
+    return {
+      userId: user.userId,
+      email: user.email,
+      phone: user.phone,
+      displayName: user.displayName,
+      avatarAssetId: user.avatarAssetId,
+      avatarUrl,
       status: user.status,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,

@@ -23,6 +23,7 @@ import {
 } from './auth.constants';
 import { EmailModule } from '../email/email.module';
 import { EmailService } from '../email/email.service';
+import { MediaModule } from '../media/media.module';
 
 // Infrastructure Implementations
 import { UserRepository } from '../../infrastructure/database/repositories/user.repository';
@@ -36,6 +37,7 @@ import { BcryptHashService } from '../../infrastructure/auth/bcrypt-hash.service
 @Module({
   imports: [
     EmailModule,
+    MediaModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
