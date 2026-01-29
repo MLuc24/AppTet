@@ -43,8 +43,56 @@ export class LessonRepository implements ILessonRepository {
     return lessons.map((l) => this.toDomain(l, languageId));
   }
 
+  async findByCourseVersion(
+    courseVersionId: string,
+    languageId?: number,
+  ): Promise<LessonEntity[]> {
+    const lessons = await this.prisma.lessons.findMany({
+      where: {
+        skills: {
+          units: {
+            course_version_id: courseVersionId,
+          },
+        },
+      },
+      include: {
+        lesson_localizations: true,
+        skills: {
+          select: {
+            order_index: true,
+            units: { select: { order_index: true } },
+          },
+        },
+      },
+    });
+
+    const sorted = lessons.sort((a, b) => {
+      const aUnitOrder = a.skills?.units?.order_index ?? 0;
+      const bUnitOrder = b.skills?.units?.order_index ?? 0;
+      if (aUnitOrder !== bUnitOrder) return aUnitOrder - bUnitOrder;
+      const aSkillOrder = a.skills?.order_index ?? 0;
+      const bSkillOrder = b.skills?.order_index ?? 0;
+      if (aSkillOrder !== bSkillOrder) return aSkillOrder - bSkillOrder;
+      return a.order_index - b.order_index;
+    });
+
+    return sorted.map((lesson) => this.toDomain(lesson, languageId));
+  }
+
   async countBySkillId(skillId: string): Promise<number> {
     return this.prisma.lessons.count({ where: { skill_id: skillId } });
+  }
+
+  async countByCourseVersion(courseVersionId: string): Promise<number> {
+    return this.prisma.lessons.count({
+      where: {
+        skills: {
+          units: {
+            course_version_id: courseVersionId,
+          },
+        },
+      },
+    });
   }
 
   async create(data: CreateLessonData): Promise<LessonEntity> {

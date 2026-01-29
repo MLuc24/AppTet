@@ -13,3 +13,8 @@ export * from './skill.repository';
 export * from './lesson.repository';
 export * from './enrollment.repository';
 export * from './lesson-progress.repository';
+export * from './practice-session.repository';
+export * from './xp-ledger.repository';
+export * from './streak.repository';
+export * from './review-queue.repository';
+export * from './notification.repository';

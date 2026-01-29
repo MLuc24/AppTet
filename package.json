@@ -7,9 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "mobile": "npm run start --workspace=@lms/mobile-app",
-    "backend": "npm run start:dev --workspace=@lms/backend-api",
-    "admin": "npm run dev --workspace=@lms/admin-web",
+    "mobile": "npm run start --workspace=mobile-app",
+    "backend": "npm run start:dev --workspace=backend-api",
+    "admin": "npm run dev --workspace=admin-web",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""

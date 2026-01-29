@@ -10,6 +10,7 @@ import {
   CreateSessionData,
   CreateAttemptData,
   CreateResponseData,
+  PracticeSessionRecord,
 } from '../../../domain/ports/practice-session-repository.port';
 import {
   PracticeSessionEntity,
@@ -88,6 +89,27 @@ export class PracticeSessionRepository implements IPracticeSessionRepository {
 
     if (!session) return null;
     return this.toEntity(session);
+  }
+
+  async findByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<PracticeSessionRecord[]> {
+    const sessions = await this.prisma.practice_sessions.findMany({
+      where: {
+        user_id: userId,
+        started_at: { gte: start, lt: end },
+      },
+      orderBy: { started_at: 'asc' },
+    });
+
+    return sessions.map((session) => ({
+      sessionId: session.session_id,
+      lessonId: session.lesson_id,
+      startedAt: session.started_at ?? new Date(),
+      endedAt: session.ended_at ?? undefined,
+    }));
   }
 
   async createSession(data: CreateSessionData): Promise<PracticeSessionEntity> {

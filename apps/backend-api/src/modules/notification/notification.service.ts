@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { DeviceEntity } from '../../domain/entities/device.entity';
 import { DeviceRepository } from '../../infrastructure/database/repositories/device.repository';
 import { PushTokenRepository } from '../../infrastructure/database/repositories/push-token.repository';
+import { NotificationRepository } from '../../infrastructure/database/repositories/notification.repository';
 import { FirebaseAdminService } from './firebase-admin.service';
 import {
   DeactivatePushTokenDto,
@@ -16,6 +17,7 @@ export class NotificationService {
   constructor(
     private readonly deviceRepository: DeviceRepository,
     private readonly pushTokenRepository: PushTokenRepository,
+    private readonly notificationRepository: NotificationRepository,
     private readonly firebaseAdminService: FirebaseAdminService,
   ) {}
 
@@ -130,6 +132,64 @@ export class NotificationService {
       message: 'Notification sent',
       successCount: result.successCount,
       failureCount: result.failureCount,
+    };
+  }
+
+  async getSummary(userId: string): Promise<{ unreadCount: number }> {
+    const unreadCount =
+      await this.notificationRepository.countUnreadByUserId(userId);
+    return { unreadCount };
+  }
+
+  async markAsRead(
+    userId: string,
+    notificationId: string,
+  ): Promise<{ success: boolean; notificationId: string; readAt: Date }> {
+    const notification = await this.notificationRepository.findById(
+      notificationId,
+      userId,
+    );
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    if (notification.read_at) {
+      return {
+        success: true,
+        notificationId,
+        readAt: notification.read_at,
+      };
+    }
+
+    const readAt = await this.notificationRepository.markAsRead(
+      notificationId,
+      userId,
+    );
+
+    this.logger.log(
+      `Notification ${notificationId} marked as read for user ${userId}`,
+    );
+
+    return {
+      success: true,
+      notificationId,
+      readAt,
+    };
+  }
+
+  async markAllAsRead(
+    userId: string,
+  ): Promise<{ success: boolean; markedCount: number }> {
+    const markedCount = await this.notificationRepository.markAllAsRead(userId);
+
+    this.logger.log(
+      `Marked ${markedCount} notifications as read for user ${userId}`,
+    );
+
+    return {
+      success: true,
+      markedCount,
     };
   }
 }

@@ -29,7 +29,12 @@ export interface ILessonRepository {
   // Query methods
   findById(lessonId: string, languageId?: number): Promise<LessonEntity | null>;
   findBySkillId(skillId: string, languageId?: number): Promise<LessonEntity[]>;
+  findByCourseVersion(
+    courseVersionId: string,
+    languageId?: number,
+  ): Promise<LessonEntity[]>;
   countBySkillId(skillId: string): Promise<number>;
+  countByCourseVersion(courseVersionId: string): Promise<number>;
 
   // Command methods
   create(data: CreateLessonData): Promise<LessonEntity>;

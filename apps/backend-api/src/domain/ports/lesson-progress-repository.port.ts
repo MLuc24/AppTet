@@ -32,4 +32,22 @@ export interface ILessonProgressRepository {
    * Count completed lessons for an enrollment
    */
   countCompletedByEnrollment(enrollmentId: string): Promise<number>;
+
+  /**
+   * Count completed lessons for a user in a time range
+   */
+  countCompletedByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<number>;
+
+  /**
+   * List completed lesson timestamps for a user in a time range
+   */
+  findCompletedDatesByUserInRange(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<Date[]>;
 }

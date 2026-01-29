@@ -16,6 +16,8 @@ import { AiModule } from '../modules/ai/ai.module';
 import { NotificationModule } from '../modules/notification/notification.module';
 import { EmailModule } from '../modules/email/email.module';
 import { MediaModule } from '../modules/media/media.module';
+import { HomeModule } from '../modules/home/home.module';
+import { GamificationModule } from '../modules/gamification/gamification.module';
 
 // Global guards, filters, interceptors
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -42,6 +44,8 @@ import { TransformInterceptor } from '../common/interceptors/transform.intercept
     LearningModule,
     AiModule,
     NotificationModule,
+    HomeModule,
+    GamificationModule,
   ],
   controllers: [AppController],
   providers: [

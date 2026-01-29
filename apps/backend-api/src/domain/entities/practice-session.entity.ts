@@ -114,6 +114,13 @@ export class PracticeSessionEntity {
     return this.endedAt.getTime() - this.startedAt.getTime();
   }
 
+  // Serialization
+  toJSON(): PracticeSessionProps {
+    return {
+      ...this.props,
+    };
+  }
+
   // Factory method
   static create(props: PracticeSessionProps): PracticeSessionEntity {
     return new PracticeSessionEntity(props);
